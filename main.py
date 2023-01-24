@@ -59,19 +59,21 @@ if __name__ == '__main__':
     def tokenize_function(examples):
         return tokenizer(examples[dataset_config['text_field']], truncation=True)
     tokenized_dataset = dataset.map(tokenize_function, batched=True)
+    tokenized_dataset = tokenized_dataset.rename_column(dataset_config['label_field'], 'label')
     data_collator = transformers.DataCollatorWithPadding(tokenizer=tokenizer)
 
     # define model, metrics, loss func and train model
-    model = transformers.AutoModelForSequenceClassification.from_pretrained(checkpoint)
+    model = transformers.AutoModelForSequenceClassification.from_pretrained(checkpoint, num_labels=model_config['class_num'])
     def compute_metrics(eval_preds):
         metric = evaluate.load("glue", "sst2")
         logits, labels = eval_preds
         predictions = np.argmax(logits, axis=-1)
         return metric.compute(predictions=predictions, references=labels)
 
-    train_args = transformers.TrainingArguments("trainer", evaluation_strategy=IntervalStrategy.EPOCH,
-                                                logging_strategy=IntervalStrategy.STEPS,
-                                                logging_steps=50, report_to=["tensorboard"])
+    train_args = transformers.TrainingArguments("trainer", report_to=["tensorboard"],
+                                                save_strategy=IntervalStrategy.STEPS, save_steps=500,
+                                                evaluation_strategy=IntervalStrategy.STEPS, eval_steps=1000,
+                                                logging_strategy=IntervalStrategy.STEPS, logging_steps=500)
     trainer = transformers.Trainer(model, train_args, train_dataset=tokenized_dataset['train'],
                                    eval_dataset=tokenized_dataset['validation'], data_collator=data_collator,
                                    compute_metrics=compute_metrics)

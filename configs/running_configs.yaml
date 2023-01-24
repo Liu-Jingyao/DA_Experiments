@@ -1,5 +1,5 @@
 environment: 'vpn' # vpn, local, quanzhou
 default:
-  dataset: 'imdb'
+  dataset: 'imdb' # sst-2, imdb, rotten_tomatoes, sentiment140, yelp_review_full, amazon_reviews_multi
   model: 'distilbert'
 
