@@ -1,0 +1,5 @@
+environment: 'vpn' # vpn, local, quanzhou
+default:
+  dataset: 'sst-2'
+  model: 'distilbert'
+

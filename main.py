@@ -1,4 +1,5 @@
 import os
+import sys
 import yaml
 import torch
 import random
@@ -10,29 +11,25 @@ import pytorch_lightning as pl
 from transformers import IntervalStrategy
 
 ROOT_PATH = os.path.dirname(os.path.abspath(__file__))
+task_name = sys.argv[1] if len(sys.argv) > 1 else 'default'
 
-MODEL = 'distilbert'  # distilbert, bi-lstm
-DATASET = 'sst-2'
-RUNNING_WAY = 'train_eval'
-RUN_ENVIRONMENT = 'vpn'  # vpn, local, quanzhou
 dataset_config = model_config = running_config = dict()
-
 
 def init_project():
     # load configuration files
     CONFIG_BASE_PATH = os.path.join(ROOT_PATH, "configs")
     global dataset_config, model_config, running_config
-    with open(os.path.join(CONFIG_BASE_PATH, "dataset_configs", f'{DATASET}.yaml'), "r") as f1, \
-            open(os.path.join(CONFIG_BASE_PATH, "model_configs", f'{MODEL}.yaml'), "r") as f2, \
-            open(os.path.join(CONFIG_BASE_PATH, "running_configs", f'{RUNNING_WAY}.yaml'), "r") as f3:
-        dataset_config = yaml.safe_load(f1)
-        model_config = yaml.safe_load(f2)
-        running_config = yaml.safe_load(f3)
+    with open(os.path.join(CONFIG_BASE_PATH, "running_configs.yaml"), "r") as f_running_configs, \
+            open(os.path.join(CONFIG_BASE_PATH, "model_configs.yaml"), "r") as f_model_configs, \
+            open(os.path.join(CONFIG_BASE_PATH, "dataset_configs.yaml"), "r") as f_dataset_configs:
+        running_config = yaml.safe_load(f_running_configs)
+        model_config = yaml.safe_load(f_model_configs)[running_config[task_name]['model']]
+        dataset_config = yaml.safe_load(f_dataset_configs)[running_config[task_name]['dataset']]
 
     # init system proxy
     PROXY_DICT = {'vpn': 'http://127.0.0.1:7890', 'quanzhou': 'http://10.55.146.88:12798'}
-    if RUN_ENVIRONMENT != 'local':
-        os.environ['HTTP_PROXY'] = os.environ['HTTPS_PROXY'] = PROXY_DICT[RUN_ENVIRONMENT]
+    if running_config['environment'] != 'local':
+        os.environ['HTTP_PROXY'] = os.environ['HTTPS_PROXY'] = PROXY_DICT[running_config['environment']]
 
     # init random seeds
     SEED = 1234

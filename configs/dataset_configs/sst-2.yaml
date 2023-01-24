@@ -1,4 +1,0 @@
-dataset: 'glue'
-subset: 'sst2'
-loading_way: 'huggingface'
-class_num: 2

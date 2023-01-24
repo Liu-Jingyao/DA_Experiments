@@ -1,0 +1,2 @@
+distilbert:
+  checkpoint: "distilbert-base-uncased"
