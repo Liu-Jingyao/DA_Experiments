@@ -9,6 +9,8 @@ import numpy as np
 import transformers
 from transformers import IntervalStrategy
 
+from SizedIterableDataset import SizedIterableDataset
+
 ROOT_PATH = os.path.dirname(os.path.abspath(__file__))
 task_name = sys.argv[1] if len(sys.argv) > 1 else 'default'
 
@@ -49,13 +51,14 @@ if __name__ == '__main__':
     else:
         dataset.shuffle(seed=42)
     train_size = dataset_config['splits']['train'] if big_dataset else dataset['train'].num_rows
+    eval_size = int(train_size * 0.2) if 'validation' not in dataset.keys() else dataset['validation'].num_rows
 
     # split train-validation set
     if 'validation' not in dataset.keys():
         if big_dataset:
-            train_dataset = dataset['train'].skip(int(train_size * 0.2))
-            validation_dataset = dataset['train'].take(int(train_size * 0.2))
-            train_size = train_size - train_size * 0.2
+            train_dataset = dataset['train'].skip(eval_size)
+            validation_dataset = dataset['train'].take(eval_size)
+            train_size = train_size - eval_size
             dataset['train'] = train_dataset
             dataset['validation'] = validation_dataset
         else:
@@ -68,7 +71,6 @@ if __name__ == '__main__':
         dataset.map(lambda example:
                     {dataset_config['text_field']: f"{example[dataset_config['title_field']]}\n"
                                                    f"{example[dataset_config['text_field']]}"})
-        dataset.remove_columns(dataset_config['title_field'])
     # change the label_field name
     if dataset_config['label_field'] != 'label':
         dataset = dataset.rename_column(dataset_config['label_field'], 'label')
@@ -76,7 +78,9 @@ if __name__ == '__main__':
     # check whether the label is starting from 0 and the growth rate is 1
     if 'label_dict' in dataset_config.keys():
         dataset.map(lambda example: {'label': dataset_config['label_dict'][example['label']]})
-
+    a = datasets.IterableDataset
+    a = property
+    # tokenize
     def tokenize_function(examples):
         return tokenizer(examples[dataset_config['text_field']], truncation=True)
     tokenized_dataset = dataset.map(tokenize_function, batched=True)
@@ -89,13 +93,13 @@ if __name__ == '__main__':
         logits, labels = eval_preds
         predictions = np.argmax(logits, axis=-1)
         return metric.compute(predictions=predictions, references=labels)
-
     train_args = transformers.TrainingArguments("trainer", report_to=['tensorboard'],
                                                 save_strategy=IntervalStrategy.STEPS, save_steps=500,
                                                 evaluation_strategy=IntervalStrategy.STEPS, eval_steps=1000,
-                                                logging_strategy=IntervalStrategy.STEPS, logging_steps=500,
-                                                max_steps=train_size*3 if big_dataset else -1)
-    trainer = transformers.Trainer(model, train_args, train_dataset=tokenized_dataset['train'],
-                                   eval_dataset=tokenized_dataset['validation'], data_collator=data_collator,
+                                                logging_strategy=IntervalStrategy.STEPS, logging_steps=500)
+    sized_train_dataset = SizedIterableDataset.convert_to_sized(tokenized_dataset['train'], train_size)
+    sized_eval_dataset = SizedIterableDataset.convert_to_sized(tokenized_dataset['validation'], eval_size)
+    trainer = transformers.Trainer(model, train_args, train_dataset=sized_train_dataset,
+                                   eval_dataset=sized_train_dataset, data_collator=data_collator,
                                    compute_metrics=compute_metrics)
     trainer.train()
