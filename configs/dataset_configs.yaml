@@ -4,35 +4,37 @@ sst-2:
   loading_way: 'huggingface'
   text_field: 'sentence'
   label_field: 'label'
-  splits: ['train', 'validation', 'test']
+  splits: {'train': 67349, 'validation': 872, 'test': 1821}
   class_num: 2
 imdb:
   dataset: 'imdb'
   loading_way: 'huggingface'
   text_field: 'text'
   label_field: 'label'
-  splits: ['train', 'test', 'unsupervised']
+  splits: {'train':25000, 'test': 25000, 'unsupervised': 50000}
   class_num: 2
 rotten_tomatoes:
   dataset: 'rotten_tomatoes'
   loading_way: 'huggingface'
   text_field: 'text'
   label_field: 'label'
-  splits: ['train', 'validation', 'test']
+  splits: {'train': 8530, 'validation': 1066, 'test': 1066}
   class_num: 2
 sentiment140:
   dataset: 'sentiment140'
   loading_way: 'huggingface'
   text_field: 'text'
   label_field: 'sentiment'
-  splits: ['train', 'test']
+  splits: {'train': 1600000, 'test': 498}
   class_num: 3
+  stream_load: true
+  label_dict: {0:0, 2:1, 4:2}
 yelp-5:
   dataset: 'yelp_review_full'
   loading_way: 'huggingface'
   text_field: 'text'
   label_field: 'label'
-  splits: ['train', 'test']
+  splits: {'train': 650000, 'test': 50000}
   class_num: 5
 amazon-5:
   dataset: 'amazon_reviews_multi'
@@ -41,5 +43,6 @@ amazon-5:
   title_field: 'review_title'
   text_field: 'review_body'
   label_field: 'stars'
-  splits: ['train', 'validation', 'test']
+  splits: {'train': 200000, 'validation': 5000, 'test': 5000}
   class_num: 5
+  label_dict: {1:0, 2:1, 3:2, 4:3, 5:4}

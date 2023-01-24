@@ -39,41 +39,62 @@ def init_project():
 
 if __name__ == '__main__':
     init_project()
-    checkpoint = model_config["checkpoint"]
+    checkpoint = model_config['checkpoint']
+    big_dataset = bool('stream_load' in dataset_config.keys())
 
     # load, preprocess and tokenize dataset
-    dataset = datasets.load_dataset(dataset_config['dataset'], dataset_config.get('subset', None))
+    dataset = datasets.load_dataset(dataset_config['dataset'], dataset_config.get('subset', None), streaming=big_dataset)
+    if big_dataset:
+        dataset.shuffle(buffer_size=10_000, seed=42)
+    else:
+        dataset.shuffle(seed=42)
+    train_size = dataset_config['splits']['train'] if big_dataset else dataset['train'].num_rows
+
     # split train-validation set
     if 'validation' not in dataset.keys():
-        dataset_clean = dataset["train"].train_test_split(train_size=0.8, seed=42)
-        dataset_clean["validation"] = dataset_clean.pop("test")
-        dataset_clean["test"] = dataset["test"]
-        dataset = dataset_clean
+        if big_dataset:
+            train_dataset = dataset['train'].skip(int(train_size * 0.2))
+            validation_dataset = dataset['train'].take(int(train_size * 0.2))
+            train_size = train_size - train_size * 0.2
+            dataset['train'] = train_dataset
+            dataset['validation'] = validation_dataset
+        else:
+            dataset_clean = dataset['train'].train_test_split(train_size=0.8, shuffle=False)
+            dataset_clean['validation'] = dataset_clean.pop("test")
+            dataset_clean['test'] = dataset['test']
+            dataset = dataset_clean
     # concat text title with content
     if 'title_field' in dataset_config.keys():
         dataset.map(lambda example:
                     {dataset_config['text_field']: f"{example[dataset_config['title_field']]}\n"
                                                    f"{example[dataset_config['text_field']]}"})
         dataset.remove_columns(dataset_config['title_field'])
+    # change the label_field name
+    if dataset_config['label_field'] != 'label':
+        dataset = dataset.rename_column(dataset_config['label_field'], 'label')
     tokenizer = transformers.AutoTokenizer.from_pretrained(checkpoint)
+    # check whether the label is starting from 0 and the growth rate is 1
+    if 'label_dict' in dataset_config.keys():
+        dataset.map(lambda example: {'label': dataset_config['label_dict'][example['label']]})
+
     def tokenize_function(examples):
         return tokenizer(examples[dataset_config['text_field']], truncation=True)
     tokenized_dataset = dataset.map(tokenize_function, batched=True)
-    tokenized_dataset = tokenized_dataset.rename_column(dataset_config['label_field'], 'label')
     data_collator = transformers.DataCollatorWithPadding(tokenizer=tokenizer)
 
     # define model, metrics, loss func and train model
-    model = transformers.AutoModelForSequenceClassification.from_pretrained(checkpoint, num_labels=model_config['class_num'])
+    model = transformers.AutoModelForSequenceClassification.from_pretrained(checkpoint, num_labels=dataset_config['class_num'])
     def compute_metrics(eval_preds):
         metric = evaluate.load("glue", "sst2")
         logits, labels = eval_preds
         predictions = np.argmax(logits, axis=-1)
         return metric.compute(predictions=predictions, references=labels)
 
-    train_args = transformers.TrainingArguments("trainer", report_to=["tensorboard"],
+    train_args = transformers.TrainingArguments("trainer", report_to=['tensorboard'],
                                                 save_strategy=IntervalStrategy.STEPS, save_steps=500,
                                                 evaluation_strategy=IntervalStrategy.STEPS, eval_steps=1000,
-                                                logging_strategy=IntervalStrategy.STEPS, logging_steps=500)
+                                                logging_strategy=IntervalStrategy.STEPS, logging_steps=500,
+                                                max_steps=train_size*3 if big_dataset else -1)
     trainer = transformers.Trainer(model, train_args, train_dataset=tokenized_dataset['train'],
                                    eval_dataset=tokenized_dataset['validation'], data_collator=data_collator,
                                    compute_metrics=compute_metrics)
