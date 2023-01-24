@@ -2,4 +2,44 @@ sst-2:
   dataset: 'glue'
   subset: 'sst2'
   loading_way: 'huggingface'
+  text_field: 'sentence'
+  label_field: 'label'
+  splits: ['train', 'validation', 'test']
   class_num: 2
+imdb:
+  dataset: 'imdb'
+  loading_way: 'huggingface'
+  text_field: 'text'
+  label_field: 'label'
+  splits: ['train', 'test', 'unsupervised']
+  class_num: 2
+rotten_tomatoes:
+  dataset: 'rotten_tomatoes'
+  loading_way: 'huggingface'
+  text_field: 'text'
+  label_field: 'label'
+  splits: ['train', 'validation', 'test']
+  class_num: 2
+sentiment140:
+  dataset: 'sentiment140'
+  loading_way: 'huggingface'
+  text_field: 'text'
+  label_field: 'sentiment'
+  splits: ['train', 'test']
+  class_num: 3
+yelp-5:
+  dataset: 'yelp_review_full'
+  loading_way: 'huggingface'
+  text_field: 'text'
+  label_field: 'label'
+  splits: ['train', 'test']
+  class_num: 5
+amazon-5:
+  dataset: 'amazon_reviews_multi'
+  subset: 'en'
+  loading_way: 'huggingface'
+  title_field: 'review_title'
+  text_field: 'review_body'
+  label_field: 'stars'
+  splits: ['train', 'validation', 'test']
+  class_num: 5

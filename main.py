@@ -7,7 +7,6 @@ import datasets
 import evaluate
 import numpy as np
 import transformers
-import pytorch_lightning as pl
 from transformers import IntervalStrategy
 
 ROOT_PATH = os.path.dirname(os.path.abspath(__file__))
@@ -32,26 +31,37 @@ def init_project():
         os.environ['HTTP_PROXY'] = os.environ['HTTPS_PROXY'] = PROXY_DICT[running_config['environment']]
 
     # init random seeds
-    SEED = 1234
+    SEED = 42
     np.random.seed(SEED)
     random.seed(SEED)
     torch.manual_seed(SEED)
     torch.backends.cudnn.deterministic = True
 
-
 if __name__ == '__main__':
     init_project()
     checkpoint = model_config["checkpoint"]
 
-    # process dataset
+    # load, preprocess and tokenize dataset
     dataset = datasets.load_dataset(dataset_config['dataset'], dataset_config.get('subset', None))
+    # split train-validation set
+    if 'validation' not in dataset.keys():
+        dataset_clean = dataset["train"].train_test_split(train_size=0.8, seed=42)
+        dataset_clean["validation"] = dataset_clean.pop("test")
+        dataset_clean["test"] = dataset["test"]
+        dataset = dataset_clean
+    # concat text title with content
+    if 'title_field' in dataset_config.keys():
+        dataset.map(lambda example:
+                    {dataset_config['text_field']: f"{example[dataset_config['title_field']]}\n"
+                                                   f"{example[dataset_config['text_field']]}"})
+        dataset.remove_columns(dataset_config['title_field'])
     tokenizer = transformers.AutoTokenizer.from_pretrained(checkpoint)
     def tokenize_function(examples):
-        return tokenizer(examples["sentence"], truncation=True)
+        return tokenizer(examples[dataset_config['text_field']], truncation=True)
     tokenized_dataset = dataset.map(tokenize_function, batched=True)
     data_collator = transformers.DataCollatorWithPadding(tokenizer=tokenizer)
 
-    # define model, metrics, loss and train
+    # define model, metrics, loss func and train model
     model = transformers.AutoModelForSequenceClassification.from_pretrained(checkpoint)
     def compute_metrics(eval_preds):
         metric = evaluate.load("glue", "sst2")

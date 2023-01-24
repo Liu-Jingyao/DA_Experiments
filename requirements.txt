@@ -2,5 +2,3 @@ scikit-learn
 transformers
 datasets
 evaluate
-pytorch_lightning
-tensorflow_datasets

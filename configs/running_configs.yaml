@@ -1,5 +1,5 @@
 environment: 'vpn' # vpn, local, quanzhou
 default:
-  dataset: 'sst-2'
+  dataset: 'imdb'
   model: 'distilbert'
 
