@@ -28,7 +28,7 @@ def init_project():
         dataset_config = yaml.safe_load(f_dataset_configs)[running_config[task_name]['dataset']]
 
     # init system proxy
-    PROXY_DICT = {'vpn': 'http://127.0.0.1:7890', 'quanzhou': 'http://10.55.146.88:12798'}
+    PROXY_DICT = {'vpn': 'http://127.0.0.1:7890', 'quanzhou': 'http://10.55.146.88:12798', 'beijing': 'http://100.72.64.19:12798'}
     if running_config['environment'] != 'local':
         os.environ['HTTP_PROXY'] = os.environ['HTTPS_PROXY'] = PROXY_DICT[running_config['environment']]
 
@@ -51,7 +51,7 @@ if __name__ == '__main__':
     else:
         dataset = dataset.shuffle(seed=SEED)
     train_size = dataset_config['splits']['train'] if big_dataset else dataset['train'].num_rows
-    eval_size = 25_000 if 'validation' not in dataset.keys() else dataset['validation'].num_rows
+    eval_size = 2_500 if 'validation' not in dataset.keys() else dataset['validation'].num_rows
 
     # split train-validation set
     if 'validation' not in dataset.keys():
@@ -68,15 +68,20 @@ if __name__ == '__main__':
             dataset = dataset_clean
     # concat text title with content
     if 'title_field' in dataset_config.keys():
-        dataset = dataset.map(lambda example:
-                    {dataset_config['text_field']: f"{example[dataset_config['title_field']]}\n"
-                                                   f"{example[dataset_config['text_field']]}"})
+        dataset = dataset.map(lambda batch: {dataset_config['text_field']:
+                                                 [f"{title}\n{text}"
+                                                  for title in batch[dataset_config['title_field']]
+                                                  for text in batch[dataset_config['text_field']]]}, batched=True)
     # change the label_field name
     if dataset_config['label_field'] != 'label':
         dataset = dataset.rename_column(dataset_config['label_field'], 'label')
     # check whether the label is starting from 0 and the growth rate is 1
     if 'label_dict' in dataset_config.keys():
-        dataset = dataset.map(lambda example: {'label': dataset_config['label_dict'][example['label']]})
+         dataset = dataset.map(lambda batch: {'label': [dataset_config['label_dict'][ori_label]
+                                                        for ori_label in batch['label']]}, batched=True)
+
+    # for ins in dataset['train']:
+    #     print(ins)
 
     # tokenize
     tokenizer = transformers.AutoTokenizer.from_pretrained(checkpoint)
