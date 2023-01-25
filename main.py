@@ -38,16 +38,6 @@ def init_project():
     torch.manual_seed(SEED)
     torch.backends.cudnn.deterministic = True
 
-class CustomIterableDataset(torch.utils.data.IterableDataset):
-    def __init__(self, hf_iterable_dataset, num_rows):
-        self.hf_iterable_dataset = hf_iterable_dataset
-        self.num_rows = num_rows
-    def __iter__(self):
-        while True:
-            yield next(iter(self.hf_iterable_dataset))
-    def __len__(self):
-        return self.num_rows
-
 if __name__ == '__main__':
     init_project()
     checkpoint = model_config['checkpoint']
@@ -60,7 +50,8 @@ if __name__ == '__main__':
     else:
         dataset.shuffle(seed=42)
     train_size = dataset_config['splits']['train'] if big_dataset else dataset['train'].num_rows
-    eval_size = int(train_size * 0.2) if 'validation' not in dataset.keys() else dataset['validation'].num_rows
+    # eval_size = int(train_size * 0.2) if 'validation' not in dataset.keys() else dataset['validation'].num_rows
+    eval_size = 25000
 
     # split train-validation set
     if 'validation' not in dataset.keys():
@@ -96,17 +87,17 @@ if __name__ == '__main__':
     # define model, metrics, loss func and train model
     model = transformers.AutoModelForSequenceClassification.from_pretrained(checkpoint, num_labels=dataset_config['class_num'])
     def compute_metrics(eval_preds):
-        metric = evaluate.load("accuracy")
+        metric = evaluate.load('accuracy')
         logits, labels = eval_preds
         predictions = np.argmax(logits, axis=-1)
         return metric.compute(predictions=predictions, references=labels)
-    train_args = transformers.TrainingArguments("trainer", report_to=['tensorboard'],
-                                                save_strategy=IntervalStrategy.STEPS, save_steps=500,
-                                                evaluation_strategy=IntervalStrategy.STEPS, eval_steps=1000,
-                                                logging_strategy=IntervalStrategy.STEPS, logging_steps=500)
-    sized_train_dataset = CustomIterableDataset(tokenized_dataset['train'].with_format('torch'), train_size)
-    sized_validation_dataset = CustomIterableDataset(tokenized_dataset['validation'].with_format('torch'), eval_size)
-    trainer = transformers.Trainer(model, train_args, train_dataset=sized_train_dataset,
-                                   eval_dataset=sized_validation_dataset, data_collator=data_collator,
+    train_args = transformers.TrainingArguments("trainer", report_to=['tensorboard'], max_steps=train_size * 3,
+                                                save_strategy=IntervalStrategy.STEPS, save_steps=1000, seed =42,
+                                                evaluation_strategy=IntervalStrategy.STEPS, eval_steps=500,
+                                                logging_strategy=IntervalStrategy.STEPS, logging_steps=100,
+                                                load_best_model_at_end=True, metric_for_best_model='accuracy',
+                                                group_by_length=True)
+    trainer = transformers.Trainer(model, train_args, train_dataset=tokenized_dataset['train'].with_format('torch'),
+                                   eval_dataset=tokenized_dataset['validation'].with_format('torch'), data_collator=data_collator,
                                    compute_metrics=compute_metrics)
     trainer.train()
