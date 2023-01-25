@@ -60,8 +60,7 @@ if __name__ == '__main__':
             dataset['train'] = train_dataset
             dataset['validation'] = validation_dataset
         else:
-            # dataset_clean = dataset['train'].train_test_split(train_size=0.8, shuffle=False)
-            dataset_clean = dataset['train'].train_test_split(eval_size=eval_size, shuffle=False)
+            dataset_clean = dataset['train'].train_test_split(train_size=train_size-eval_size, shuffle=False)
             dataset['train'] = dataset_clean.pop('train')
             dataset['validation'] = dataset_clean.pop('test')
         train_size = train_size - eval_size
