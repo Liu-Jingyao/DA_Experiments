@@ -9,7 +9,6 @@ import numpy as np
 import transformers
 from transformers import IntervalStrategy
 
-from SizedIterableDataset import SizedIterableDataset
 
 ROOT_PATH = os.path.dirname(os.path.abspath(__file__))
 task_name = sys.argv[1] if len(sys.argv) > 1 else 'default'
@@ -38,6 +37,16 @@ def init_project():
     random.seed(SEED)
     torch.manual_seed(SEED)
     torch.backends.cudnn.deterministic = True
+
+class CustomIterableDataset(torch.utils.data.IterableDataset):
+    def __init__(self, hf_iterable_dataset, num_rows):
+        self.hf_iterable_dataset = hf_iterable_dataset
+        self.num_rows = num_rows
+    def __iter__(self):
+        while True:
+            yield next(iter(self.hf_iterable_dataset))
+    def __len__(self):
+        return self.num_rows
 
 if __name__ == '__main__':
     init_project()
@@ -78,8 +87,6 @@ if __name__ == '__main__':
     # check whether the label is starting from 0 and the growth rate is 1
     if 'label_dict' in dataset_config.keys():
         dataset.map(lambda example: {'label': dataset_config['label_dict'][example['label']]})
-    a = datasets.IterableDataset
-    a = property
     # tokenize
     def tokenize_function(examples):
         return tokenizer(examples[dataset_config['text_field']], truncation=True)
@@ -89,7 +96,7 @@ if __name__ == '__main__':
     # define model, metrics, loss func and train model
     model = transformers.AutoModelForSequenceClassification.from_pretrained(checkpoint, num_labels=dataset_config['class_num'])
     def compute_metrics(eval_preds):
-        metric = evaluate.load("glue", "sst2")
+        metric = evaluate.load("accuracy")
         logits, labels = eval_preds
         predictions = np.argmax(logits, axis=-1)
         return metric.compute(predictions=predictions, references=labels)
@@ -97,9 +104,9 @@ if __name__ == '__main__':
                                                 save_strategy=IntervalStrategy.STEPS, save_steps=500,
                                                 evaluation_strategy=IntervalStrategy.STEPS, eval_steps=1000,
                                                 logging_strategy=IntervalStrategy.STEPS, logging_steps=500)
-    sized_train_dataset = SizedIterableDataset.convert_to_sized(tokenized_dataset['train'], train_size)
-    sized_eval_dataset = SizedIterableDataset.convert_to_sized(tokenized_dataset['validation'], eval_size)
+    sized_train_dataset = CustomIterableDataset(tokenized_dataset['train'].with_format('torch'), train_size)
+    sized_validation_dataset = CustomIterableDataset(tokenized_dataset['validation'].with_format('torch'), eval_size)
     trainer = transformers.Trainer(model, train_args, train_dataset=sized_train_dataset,
-                                   eval_dataset=sized_train_dataset, data_collator=data_collator,
+                                   eval_dataset=sized_validation_dataset, data_collator=data_collator,
                                    compute_metrics=compute_metrics)
     trainer.train()

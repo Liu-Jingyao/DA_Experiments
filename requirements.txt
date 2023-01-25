@@ -1,4 +1,4 @@
 scikit-learn
-transformers
+git+https://github.com/huggingface/transformers
 datasets
 evaluate
