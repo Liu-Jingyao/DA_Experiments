@@ -9,11 +9,12 @@ import numpy as np
 import transformers
 from transformers import IntervalStrategy
 
-
 ROOT_PATH = os.path.dirname(os.path.abspath(__file__))
 task_name = sys.argv[1] if len(sys.argv) > 1 else 'default'
+SEED = 42
 
 dataset_config = model_config = running_config = dict()
+
 
 def init_project():
     # load configuration files
@@ -32,11 +33,11 @@ def init_project():
         os.environ['HTTP_PROXY'] = os.environ['HTTPS_PROXY'] = PROXY_DICT[running_config['environment']]
 
     # init random seeds
-    SEED = 42
     np.random.seed(SEED)
     random.seed(SEED)
     torch.manual_seed(SEED)
     torch.backends.cudnn.deterministic = True
+
 
 if __name__ == '__main__':
     init_project()
@@ -46,12 +47,11 @@ if __name__ == '__main__':
     # load, preprocess and tokenize dataset
     dataset = datasets.load_dataset(dataset_config['dataset'], dataset_config.get('subset', None), streaming=big_dataset)
     if big_dataset:
-        dataset.shuffle(buffer_size=10_000, seed=42)
+        dataset = dataset.shuffle(buffer_size=1_000_000, seed=SEED)
     else:
-        dataset.shuffle(seed=42)
+        dataset = dataset.shuffle(seed=SEED)
     train_size = dataset_config['splits']['train'] if big_dataset else dataset['train'].num_rows
-    # eval_size = int(train_size * 0.2) if 'validation' not in dataset.keys() else dataset['validation'].num_rows
-    eval_size = 25000
+    eval_size = 25_000 if 'validation' not in dataset.keys() else dataset['validation'].num_rows
 
     # split train-validation set
     if 'validation' not in dataset.keys():
@@ -68,17 +68,18 @@ if __name__ == '__main__':
             dataset = dataset_clean
     # concat text title with content
     if 'title_field' in dataset_config.keys():
-        dataset.map(lambda example:
+        dataset = dataset.map(lambda example:
                     {dataset_config['text_field']: f"{example[dataset_config['title_field']]}\n"
                                                    f"{example[dataset_config['text_field']]}"})
     # change the label_field name
     if dataset_config['label_field'] != 'label':
         dataset = dataset.rename_column(dataset_config['label_field'], 'label')
-    tokenizer = transformers.AutoTokenizer.from_pretrained(checkpoint)
     # check whether the label is starting from 0 and the growth rate is 1
     if 'label_dict' in dataset_config.keys():
-        dataset.map(lambda example: {'label': dataset_config['label_dict'][example['label']]})
+        dataset = dataset.map(lambda example: {'label': dataset_config['label_dict'][example['label']]})
+
     # tokenize
+    tokenizer = transformers.AutoTokenizer.from_pretrained(checkpoint)
     def tokenize_function(examples):
         return tokenizer(examples[dataset_config['text_field']], truncation=True)
     tokenized_dataset = dataset.map(tokenize_function, batched=True)
@@ -92,12 +93,11 @@ if __name__ == '__main__':
         predictions = np.argmax(logits, axis=-1)
         return metric.compute(predictions=predictions, references=labels)
     train_args = transformers.TrainingArguments("trainer", report_to=['tensorboard'], max_steps=train_size * 3,
-                                                save_strategy=IntervalStrategy.STEPS, save_steps=1000, seed =42,
+                                                save_strategy=IntervalStrategy.STEPS, save_steps=1_000, seed=SEED,
                                                 evaluation_strategy=IntervalStrategy.STEPS, eval_steps=500,
                                                 logging_strategy=IntervalStrategy.STEPS, logging_steps=100,
-                                                load_best_model_at_end=True, metric_for_best_model='accuracy',
-                                                group_by_length=True)
+                                                load_best_model_at_end=True, metric_for_best_model='accuracy')
     trainer = transformers.Trainer(model, train_args, train_dataset=tokenized_dataset['train'].with_format('torch'),
-                                   eval_dataset=tokenized_dataset['validation'].with_format('torch'), data_collator=data_collator,
-                                   compute_metrics=compute_metrics)
+                                   eval_dataset=tokenized_dataset['validation'].with_format('torch'),
+                                   data_collator=data_collator, compute_metrics=compute_metrics)
     trainer.train()
