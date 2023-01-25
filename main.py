@@ -28,7 +28,7 @@ def init_project():
         dataset_config = yaml.safe_load(f_dataset_configs)[running_config[task_name]['dataset']]
 
     # init system proxy
-    PROXY_DICT = {'vpn': 'http://127.0.0.1:7890', 'quanzhou': 'http://10.55.146.88:12798', 'beijing': 'http://100.72.64.19:12798'}
+    PROXY_DICT = {'vpn': 'http://127.0.0.1:7890', 'quanzhou': 'http://10.55.146.88:12798', 'neimeng': '192.168.1.174:12798'}
     if running_config['environment'] != 'local':
         os.environ['HTTP_PROXY'] = os.environ['HTTPS_PROXY'] = PROXY_DICT[running_config['environment']]
 
@@ -47,25 +47,24 @@ if __name__ == '__main__':
     # load, preprocess and tokenize dataset
     dataset = datasets.load_dataset(dataset_config['dataset'], dataset_config.get('subset', None), streaming=big_dataset)
     if big_dataset:
-        dataset = dataset.shuffle(buffer_size=1_000_000, seed=SEED)
+        dataset = dataset.shuffle(buffer_size=1_000, seed=SEED)
     else:
         dataset = dataset.shuffle(seed=SEED)
     train_size = dataset_config['splits']['train'] if big_dataset else dataset['train'].num_rows
-    eval_size = 2_500 if 'validation' not in dataset.keys() else dataset['validation'].num_rows
-
+    eval_size = 2_500 # if 'validation' not in dataset.keys() else dataset['validation'].num_rows
     # split train-validation set
     if 'validation' not in dataset.keys():
         if big_dataset:
             train_dataset = dataset['train'].skip(eval_size)
             validation_dataset = dataset['train'].take(eval_size)
-            train_size = train_size - eval_size
             dataset['train'] = train_dataset
             dataset['validation'] = validation_dataset
         else:
-            dataset_clean = dataset['train'].train_test_split(train_size=0.8, shuffle=False)
-            dataset_clean['validation'] = dataset_clean.pop("test")
-            dataset_clean['test'] = dataset['test']
-            dataset = dataset_clean
+            # dataset_clean = dataset['train'].train_test_split(train_size=0.8, shuffle=False)
+            dataset_clean = dataset['train'].train_test_split(eval_size=eval_size, shuffle=False)
+            dataset['train'] = dataset_clean.pop('train')
+            dataset['validation'] = dataset_clean.pop('test')
+        train_size = train_size - eval_size
     # concat text title with content
     if 'title_field' in dataset_config.keys():
         dataset = dataset.map(lambda batch: {dataset_config['text_field']:
@@ -79,10 +78,6 @@ if __name__ == '__main__':
     if 'label_dict' in dataset_config.keys():
          dataset = dataset.map(lambda batch: {'label': [dataset_config['label_dict'][ori_label]
                                                         for ori_label in batch['label']]}, batched=True)
-
-    # for ins in dataset['train']:
-    #     print(ins)
-
     # tokenize
     tokenizer = transformers.AutoTokenizer.from_pretrained(checkpoint)
     def tokenize_function(examples):
@@ -102,7 +97,10 @@ if __name__ == '__main__':
                                                 evaluation_strategy=IntervalStrategy.STEPS, eval_steps=500,
                                                 logging_strategy=IntervalStrategy.STEPS, logging_steps=100,
                                                 load_best_model_at_end=True, metric_for_best_model='accuracy')
-    trainer = transformers.Trainer(model, train_args, train_dataset=tokenized_dataset['train'].with_format('torch'),
-                                   eval_dataset=tokenized_dataset['validation'].with_format('torch'),
+    if big_dataset:
+        tokenized_dataset['train'] = tokenized_dataset['train'].with_format('torch')
+        tokenized_dataset['validation'] = tokenized_dataset['validation'].with_format('torch')
+    trainer = transformers.Trainer(model, train_args, train_dataset=tokenized_dataset['train'],
+                                   eval_dataset=tokenized_dataset['validation'],
                                    data_collator=data_collator, compute_metrics=compute_metrics)
     trainer.train()

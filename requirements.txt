@@ -2,3 +2,4 @@ scikit-learn
 git+https://github.com/huggingface/transformers
 datasets
 evaluate
+pyyaml
