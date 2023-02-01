@@ -1,2 +1,5 @@
 distilbert:
+  pretrained: true
   checkpoint: "distilbert-base-uncased"
+cnn:
+  pretrained: false

@@ -7,14 +7,11 @@ import datasets
 import evaluate
 import numpy as np
 import transformers
-from transformers import IntervalStrategy
+from transformers import IntervalStrategy, BertForSequenceClassification
+from utils import *
 
-ROOT_PATH = os.path.dirname(os.path.abspath(__file__))
 task_name = sys.argv[1] if len(sys.argv) > 1 else 'default'
-SEED = 42
-
 dataset_config = model_config = running_config = dict()
-
 
 def init_project():
     # load configuration files
@@ -22,15 +19,18 @@ def init_project():
     global dataset_config, model_config, running_config
     with open(os.path.join(CONFIG_BASE_PATH, "running_configs.yaml"), "r") as f_running_configs, \
             open(os.path.join(CONFIG_BASE_PATH, "model_configs.yaml"), "r") as f_model_configs, \
-            open(os.path.join(CONFIG_BASE_PATH, "dataset_configs.yaml"), "r") as f_dataset_configs:
-        running_config = yaml.safe_load(f_running_configs)
-        model_config = yaml.safe_load(f_model_configs)[running_config[task_name]['model']]
-        dataset_config = yaml.safe_load(f_dataset_configs)[running_config[task_name]['dataset']]
+            open(os.path.join(CONFIG_BASE_PATH, "dataset_configs.yaml"), "r") as f_dataset_configs, \
+            open(os.path.join(CONFIG_BASE_PATH, "augmentation_configs.yaml"), "r") as f_augmentation_configs:
+        running_config = list(yaml.safe_load_all(f_running_configs))
+        environment: str = running_config[0]
+        running_config = running_config[1][task_name]
+        model_config = yaml.safe_load(f_model_configs)[running_config['model']]
+        dataset_config = yaml.safe_load(f_dataset_configs)[running_config['dataset']]
+        augmentation_config = {k: v for k, v in yaml.safe_load(f_augmentation_configs) if k in running_config['augmentations']}
 
     # init system proxy
-    PROXY_DICT = {'vpn': 'http://127.0.0.1:7890', 'quanzhou': 'http://10.55.146.88:12798', 'neimeng': '192.168.1.174:12798'}
-    if running_config['environment'] != 'local':
-        os.environ['HTTP_PROXY'] = os.environ['HTTPS_PROXY'] = PROXY_DICT[running_config['environment']]
+    if environment != 'local':
+        os.environ['HTTP_PROXY'] = os.environ['HTTPS_PROXY'] = PROXY_DICT[environment]
 
     # init random seeds
     np.random.seed(SEED)
@@ -77,25 +77,34 @@ if __name__ == '__main__':
     if 'label_dict' in dataset_config.keys():
          dataset = dataset.map(lambda batch: {'label': [dataset_config['label_dict'][ori_label]
                                                         for ori_label in batch['label']]}, batched=True)
+
+    # Low-quality text_space augmentation, inserted before the original data
+
+    # High-quality text_space augmentation, appended to the original data
+
     # tokenize
     tokenizer = transformers.AutoTokenizer.from_pretrained(checkpoint)
-    def tokenize_function(examples):
-        return tokenizer(examples[dataset_config['text_field']], truncation=True)
-    tokenized_dataset = dataset.map(tokenize_function, batched=True)
+    tokenized_dataset = dataset.map(lambda batch:
+                                    tokenizer(batch[dataset_config['text_field']], truncation=True), batched=True)
     data_collator = transformers.DataCollatorWithPadding(tokenizer=tokenizer)
 
     # define model, metrics, loss func and train model
-    model = transformers.AutoModelForSequenceClassification.from_pretrained(checkpoint, num_labels=dataset_config['class_num'])
+    if model_config['pretrained']:
+        model = transformers.AutoModelForSequenceClassification.from_pretrained(checkpoint, num_labels=dataset_config['class_num'])
+    else:
+        config = CUSTOM_MODEL_CONFIG_CLASS_DICT[running_config['model']](num_labels=dataset_config['class_num'])
+        model = CUSTOM_MODEL_CLASS_DICT[running_config['model']]()
     def compute_metrics(eval_preds):
         metric = evaluate.load('accuracy')
         logits, labels = eval_preds
         predictions = np.argmax(logits, axis=-1)
         return metric.compute(predictions=predictions, references=labels)
-    train_args = transformers.TrainingArguments("trainer", report_to=['tensorboard'], max_steps=train_size * 3,
-                                                save_strategy=IntervalStrategy.STEPS, save_steps=1_000, seed=SEED,
-                                                evaluation_strategy=IntervalStrategy.STEPS, eval_steps=500,
-                                                logging_strategy=IntervalStrategy.STEPS, logging_steps=100,
-                                                load_best_model_at_end=True, metric_for_best_model='accuracy')
+    train_args = transformers.TrainingArguments("trainer", report_to=['tensorboard'], max_steps=train_size * running_config['epochs'],
+                                                save_strategy=IntervalStrategy.STEPS, save_steps=running_config['save_steps'],
+                                                evaluation_strategy=IntervalStrategy.STEPS, eval_steps=running_config['eval_steps'],
+                                                logging_strategy=IntervalStrategy.STEPS, logging_steps=running_config['logging_steps'],
+                                                load_best_model_at_end=True, metric_for_best_model='accuracy', seed=SEED,
+                                                disable_tqdm=True, lr_scheduler_type="cosine_with_restarts")
     if big_dataset:
         tokenized_dataset['train'] = tokenized_dataset['train'].with_format('torch')
         tokenized_dataset['validation'] = tokenized_dataset['validation'].with_format('torch')

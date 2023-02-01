@@ -16,7 +16,7 @@ tokenized_datasets = dataset.map(tokenize_function, batched=True)
 
 data_collator = DataCollatorWithPadding(tokenizer = tokenizer)
 
-config = CNNConfig(vocab_size=len(tokenizer))
+config = CNNConfig(vocab_size=len(tokenizer), num_labels=2)
 model = CNN(config)
 
 
@@ -25,15 +25,13 @@ def compute_metrics(eval_preds):
     logits, labels = eval_preds
     rounded_preds = torch.round(torch.sigmoid(torch.from_numpy(logits)))
     acc = metric.compute(predictions=rounded_preds, references=labels)
-    return {
-        'accuracy': acc
-    }
+    return acc
 
 
-train_args = transformers.TrainingArguments("trainer", save_strategy="steps", save_steps=1000,
+train_args = transformers.TrainingArguments("trainer", save_strategy="steps", save_steps=1_000,
                                                 evaluation_strategy="steps", eval_steps=100,
                                                 logging_strategy="steps", logging_steps=100, label_names=['labels'],
-                                            disable_tqdm=True)
+                                            disable_tqdm=True, lr_scheduler_type="cosine_with_restarts")
 trainer = transformers.Trainer(model, train_args, train_dataset=tokenized_datasets['train'],
                                data_collator=data_collator,
                                eval_dataset=tokenized_datasets['validation'],
