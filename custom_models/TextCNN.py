@@ -2,6 +2,8 @@ from abc import ABC
 
 import torch.nn
 from transformers import PreTrainedModel, PretrainedConfig
+from transformers.utils import ModelOutput
+
 
 class CNNConfig(PretrainedConfig):
     model_type = 'cnn'
@@ -41,5 +43,5 @@ class CNN(PreTrainedModel, ABC):
         criterion = torch.nn.CrossEntropyLoss()
         loss = criterion(logits, labels)
 
-        return {'logits': logits, 'loss': loss}
+        return ModelOutput(logits=logits, loss=loss)
 

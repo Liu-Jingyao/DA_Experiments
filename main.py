@@ -1,4 +1,4 @@
-import os
+import copy
 import sys
 import yaml
 import torch
@@ -7,30 +7,32 @@ import datasets
 import evaluate
 import numpy as np
 import transformers
-from transformers import IntervalStrategy, BertForSequenceClassification
+from transformers import IntervalStrategy
 from utils import *
 
 task_name = sys.argv[1] if len(sys.argv) > 1 else 'default'
-dataset_config = model_config = running_config = dict()
+running_config_list = augmentation_config_list = list()
+running_config = environment_config = dataset_config = model_config = dict()
 
 def init_project():
     # load configuration files
     CONFIG_BASE_PATH = os.path.join(ROOT_PATH, "configs")
-    global dataset_config, model_config, running_config
+    global running_config_list, augmentation_config_list, running_config, environment_config, dataset_config, model_config
     with open(os.path.join(CONFIG_BASE_PATH, "running_configs.yaml"), "r") as f_running_configs, \
             open(os.path.join(CONFIG_BASE_PATH, "model_configs.yaml"), "r") as f_model_configs, \
             open(os.path.join(CONFIG_BASE_PATH, "dataset_configs.yaml"), "r") as f_dataset_configs, \
             open(os.path.join(CONFIG_BASE_PATH, "augmentation_configs.yaml"), "r") as f_augmentation_configs:
-        running_config = list(yaml.safe_load_all(f_running_configs))
-        environment: str = running_config[0]
-        running_config = running_config[1][task_name]
+        running_config_list = list(yaml.safe_load_all(f_running_configs))
+        environment_config = running_config_list[0]
+        running_config = running_config_list[1][task_name]
         model_config = yaml.safe_load(f_model_configs)[running_config['model']]
         dataset_config = yaml.safe_load(f_dataset_configs)[running_config['dataset']]
-        augmentation_config = {k: v for k, v in yaml.safe_load(f_augmentation_configs) if k in running_config['augmentations']}
+        augmentation_config_list = filter(lambda aug: aug['name'] in running_config['augmentations'],
+                                          yaml.safe_load(f_augmentation_configs))
 
     # init system proxy
-    if environment != 'local':
-        os.environ['HTTP_PROXY'] = os.environ['HTTPS_PROXY'] = PROXY_DICT[environment]
+    if environment_config['environment'] != 'local':
+        os.environ['HTTP_PROXY'] = os.environ['HTTPS_PROXY'] = PROXY_DICT[environment_config['environment']]
 
     # init random seeds
     np.random.seed(SEED)
@@ -41,7 +43,6 @@ def init_project():
 
 if __name__ == '__main__':
     init_project()
-    checkpoint = model_config['checkpoint']
     big_dataset = bool('stream_load' in dataset_config.keys())
 
     # load, preprocess and tokenize dataset
@@ -78,22 +79,41 @@ if __name__ == '__main__':
          dataset = dataset.map(lambda batch: {'label': [dataset_config['label_dict'][ori_label]
                                                         for ori_label in batch['label']]}, batched=True)
 
-    # Low-quality text_space augmentation, inserted before the original data
+    # text_space augmentation, inserted before the original data
+    text_augmentations = list(filter(lambda aug: aug_config['space'] == 'text', augmentation_config_list))
+    feature_augmentations = list(filter(lambda aug: aug_config['space'] == 'feature', augmentation_config_list))
 
-    # High-quality text_space augmentation, appended to the original data
+    for aug_config in text_augmentations:
+        data_augmentation = DATA_AUGMENTATION_DICT[aug_config['name']](text_field=dataset_config['text_field'])
+        dataset = dataset.map(data_augmentation.embedding, batched=True)
+        aug_dataset = dataset.map(data_augmentation.transforms, batched=True)
+        if aug_config['quality'] == 'low':
+            dataset = datasets.concatenate_datasets([dataset, aug_dataset])
+        else:
+            dataset = datasets.concatenate_datasets([dataset, aug_dataset])
+
 
     # tokenize
-    tokenizer = transformers.AutoTokenizer.from_pretrained(checkpoint)
-    tokenized_dataset = dataset.map(lambda batch:
+    tokenizer = transformers.AutoTokenizer.from_pretrained(model_config.get('checkpoint', "distilbert-base-uncased"))
+    dataset = dataset.map(lambda batch:
                                     tokenizer(batch[dataset_config['text_field']], truncation=True), batched=True)
     data_collator = transformers.DataCollatorWithPadding(tokenizer=tokenizer)
 
+    # feature_space augmentation
+    if len(feature_augmentations):
+        assert len(feature_augmentations) <= 1
+        assert feature_augmentations[0]['model'] == running_config['model']
+        model_config['pretrained'] = False
+        running_config['model'] = feature_augmentations[0]['name']
+
     # define model, metrics, loss func and train model
     if model_config['pretrained']:
+        checkpoint = model_config['checkpoint']
         model = transformers.AutoModelForSequenceClassification.from_pretrained(checkpoint, num_labels=dataset_config['class_num'])
     else:
-        config = CUSTOM_MODEL_CONFIG_CLASS_DICT[running_config['model']](num_labels=dataset_config['class_num'])
-        model = CUSTOM_MODEL_CLASS_DICT[running_config['model']]()
+        config = CUSTOM_MODEL_CONFIG_CLASS_DICT[running_config['model']](num_labels=dataset_config['class_num'], tokenizer=tokenizer)
+        model = CUSTOM_MODEL_CLASS_DICT[running_config['model']](config)
+
     def compute_metrics(eval_preds):
         metric = evaluate.load('accuracy')
         logits, labels = eval_preds
@@ -106,9 +126,9 @@ if __name__ == '__main__':
                                                 load_best_model_at_end=True, metric_for_best_model='accuracy', seed=SEED,
                                                 disable_tqdm=True, lr_scheduler_type="cosine_with_restarts")
     if big_dataset:
-        tokenized_dataset['train'] = tokenized_dataset['train'].with_format('torch')
-        tokenized_dataset['validation'] = tokenized_dataset['validation'].with_format('torch')
-    trainer = transformers.Trainer(model, train_args, train_dataset=tokenized_dataset['train'],
-                                   eval_dataset=tokenized_dataset['validation'],
+        dataset['train'] = dataset['train'].with_format('torch')
+        dataset['validation'] = dataset['validation'].with_format('torch')
+    trainer = transformers.Trainer(model, train_args, train_dataset=dataset['train'],
+                                   eval_dataset=dataset['validation'],
                                    data_collator=data_collator, compute_metrics=compute_metrics)
     trainer.train()

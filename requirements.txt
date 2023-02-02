@@ -3,3 +3,4 @@ git+https://github.com/huggingface/transformers
 datasets
 evaluate
 pyyaml
+sagemaker

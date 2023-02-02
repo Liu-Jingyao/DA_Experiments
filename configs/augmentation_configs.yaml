@@ -1,3 +1,4 @@
-modifier-enhance:
+- name: 'modifier-enhance'
   space: 'feature'
   quality: 'high'
+  model: 'distilbert'
