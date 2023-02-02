@@ -1,4 +1,3 @@
-import copy
 import sys
 import yaml
 import torch
@@ -27,9 +26,8 @@ def init_project():
         running_config = running_config_list[1][task_name]
         model_config = yaml.safe_load(f_model_configs)[running_config['model']]
         dataset_config = yaml.safe_load(f_dataset_configs)[running_config['dataset']]
-        augmentation_config_list = filter(lambda aug: aug['name'] in running_config['augmentations'],
-                                          yaml.safe_load(f_augmentation_configs))
-
+        augmentation_config_list = [aug for aug in yaml.safe_load(f_augmentation_configs)
+                                    if aug['name'] in running_config['augmentations']]
     # init system proxy
     if environment_config['environment'] != 'local':
         os.environ['HTTP_PROXY'] = os.environ['HTTPS_PROXY'] = PROXY_DICT[environment_config['environment']]
@@ -80,8 +78,8 @@ if __name__ == '__main__':
                                                         for ori_label in batch['label']]}, batched=True)
 
     # text_space augmentation, inserted before the original data
-    text_augmentations = list(filter(lambda aug: aug_config['space'] == 'text', augmentation_config_list))
-    feature_augmentations = list(filter(lambda aug: aug_config['space'] == 'feature', augmentation_config_list))
+    text_augmentations = [aug for aug in augmentation_config_list if aug['space'] == 'text']
+    feature_augmentations = [aug for aug in augmentation_config_list if aug['space'] == 'feature']
 
     for aug_config in text_augmentations:
         data_augmentation = DATA_AUGMENTATION_DICT[aug_config['name']](text_field=dataset_config['text_field'])
@@ -103,28 +101,29 @@ if __name__ == '__main__':
     if len(feature_augmentations):
         assert len(feature_augmentations) <= 1
         assert feature_augmentations[0]['model'] == running_config['model']
-        model_config['pretrained'] = False
         running_config['model'] = feature_augmentations[0]['name']
 
     # define model, metrics, loss func and train model
-    if model_config['pretrained']:
+    if len(feature_augmentations) and model_config['pretrained']:
+        checkpoint = model_config['checkpoint']
+        model = CUSTOM_MODEL_CLASS_DICT[running_config['model']].from_pretrained(checkpoint, num_labels=dataset_config['class_num'], tokenizer=tokenizer)
+    elif model_config['pretrained']:
         checkpoint = model_config['checkpoint']
         model = transformers.AutoModelForSequenceClassification.from_pretrained(checkpoint, num_labels=dataset_config['class_num'])
     else:
-        config = CUSTOM_MODEL_CONFIG_CLASS_DICT[running_config['model']](num_labels=dataset_config['class_num'], tokenizer=tokenizer)
-        model = CUSTOM_MODEL_CLASS_DICT[running_config['model']](config)
+        model_config = CUSTOM_MODEL_CONFIG_CLASS_DICT[running_config['model']](num_labels=dataset_config['class_num'])
+        model = CUSTOM_MODEL_CLASS_DICT[running_config['model']](model_config)
 
     def compute_metrics(eval_preds):
         metric = evaluate.load('accuracy')
         logits, labels = eval_preds
         predictions = np.argmax(logits, axis=-1)
         return metric.compute(predictions=predictions, references=labels)
-    train_args = transformers.TrainingArguments("trainer", report_to=['tensorboard'], max_steps=train_size * running_config['epochs'],
+    train_args = transformers.TrainingArguments("trainer", report_to=['tensorboard'], max_steps=train_size * running_config['epochs'] // 8,
                                                 save_strategy=IntervalStrategy.STEPS, save_steps=running_config['save_steps'],
                                                 evaluation_strategy=IntervalStrategy.STEPS, eval_steps=running_config['eval_steps'],
                                                 logging_strategy=IntervalStrategy.STEPS, logging_steps=running_config['logging_steps'],
-                                                load_best_model_at_end=True, metric_for_best_model='accuracy', seed=SEED,
-                                                disable_tqdm=True, lr_scheduler_type="cosine_with_restarts")
+                                                load_best_model_at_end=True, metric_for_best_model='accuracy', seed=SEED)
     if big_dataset:
         dataset['train'] = dataset['train'].with_format('torch')
         dataset['validation'] = dataset['validation'].with_format('torch')
