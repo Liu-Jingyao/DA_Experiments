@@ -7,26 +7,26 @@ import torch.nn
 from transformers import PreTrainedModel, PretrainedConfig
 from transformers.utils import ModelOutput
 
-class RNNConfig(PretrainedConfig):
+from models.Base import BaseConfig
+
+
+class RNNConfig(BaseConfig):
     model_type = names.RNN
-    def __init__(self, vocab_size=40000, num_labels=3, aug_ops=[], **kwargs):
+    def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.embedding_dim = 300
-        self.vocab_size = vocab_size
-        self.output_dim = num_labels
         self.hidden_dim = 100
         self.n_layers = 5
         self.dropout_rate = 0.5
         self.bidirectional = True
-        self.aug_ops = aug_ops
 
 class RNN(PreTrainedModel, ABC):
     config_class = RNNConfig
     def __init__(self, config):
         super().__init__(config)
 
-        self.tfidf_word_dropout_flag = names.TFIDF_WORD_DROPOUT in config.aug_ops
-        self.random_word_dropout_flag = names.RANDOM_WORD_DROPOUT in config.aug_ops
+        self.tfidf_word_dropout_flag = self.config.tfidf_word_dropout_flag
+        self.random_word_dropout_flag = self.config.random_word_dropout_flag
 
         self.hidden_dim = config.hidden_dim
         self.n_layers = config.n_layers
@@ -36,8 +36,9 @@ class RNN(PreTrainedModel, ABC):
         self.fc = torch.nn.Linear(config.hidden_dim * 2 if config.bidirectional else config.hidden_dim, config.output_dim)
         self.dropout = torch.nn.Dropout(config.dropout_rate)
 
-    def forward(self, input_ids, labels, dropout_prob=None, **kwargs):
+    def forward(self, input_ids, labels, **kwargs):
         if self.training and self.tfidf_word_dropout_flag:
+            dropout_prob = kwargs.get(names.DROPOUT_PROB, None)
             keep = torch.bernoulli(1 - dropout_prob).bool()
             input_ids = torch.where(keep, input_ids, torch.empty_like(input_ids).fill_(0))
         if self.training and self.random_word_dropout_flag:

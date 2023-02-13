@@ -101,7 +101,7 @@ if __name__ == '__main__':
         dataset_list = [dataset['train']]
         for augmentation_config in text_augmentations:
             logger.info(f"processing {augmentation_config['name']}")
-            data_augmentation = DATA_AUGMENTATION_DICT[augmentation_config['name']]
+            data_augmentation = TEXT_DATA_AUGMENTATION_DICT[augmentation_config['name']]
             aug_dataset = dataset['train'].map(lambda batch: data_augmentation(batch, dataset_config['text_field']), batched=True, batch_size=running_config['map_batch_size'])
 
             if augmentation_config['quality'] == 'low':
@@ -150,16 +150,12 @@ if __name__ == '__main__':
     # define model, metrics, loss func and train model
     if model_config['pretrained']:
         checkpoint = model_config['checkpoint']
-        model_config = CUSTOM_MODEL_CONFIG_CLASS_DICT[running_config['model']].from_pretrained(checkpoint,
+        model_config = CUSTOM_MODEL_CONFIG_CLASS_DICT[running_config['model']].from_pretrained(checkpoint, num_labels=dataset_config['class_num'],
                                                                                                aug_ops=feature_augmentation_names)
-        model = CUSTOM_MODEL_CLASS_DICT[running_config['model']].from_pretrained(checkpoint,
-                                                                                 config=model_config,
-                                                                                 num_labels=dataset_config['class_num'],
-                                                                                 mirror='tuna')
+        model = CUSTOM_MODEL_CLASS_DICT[running_config['model']].from_pretrained(checkpoint, config=model_config, mirror='tuna')
     else:
-        model_config = CUSTOM_MODEL_CONFIG_CLASS_DICT[running_config['model']](vocab_size=len(tokenizer),
-                                                                               aug_ops=feature_augmentation_names,
-                                                                               num_labels=dataset_config['class_num'])
+        model_config = CUSTOM_MODEL_CONFIG_CLASS_DICT[running_config['model']](vocab_size=len(tokenizer), num_labels=dataset_config['class_num'],
+                                                                               aug_ops=feature_augmentation_names)
         model = CUSTOM_MODEL_CLASS_DICT[running_config['model']](model_config)
 
     def compute_metrics(eval_preds):

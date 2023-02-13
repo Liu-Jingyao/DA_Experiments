@@ -30,10 +30,10 @@ CUSTOM_MODEL_CLASS_DICT: Dict[str, type(PreTrainedModel)] = {names.CNN: CNN,
                                                              names.DISTILBERT: DistilBERTForSequenceClassification,
                                                              names.LSTM: LSTM,
                                                              names.RNN: RNN}
-CUSTOM_MODEL_PREPROCESS_DICT: Dict[str, callable] = {names.TFIDF: TF_IDFExtractor.batch_analyze,
+CUSTOM_MODEL_PREPROCESS_DICT: Dict[str, callable] = {names.TFIDFS: TF_IDFExtractor.batch_analyze,
                                                      names.DROPOUT_PROB: TFIDFPreProcess.batch_preprocess}
 
-DATA_AUGMENTATION_DICT: Dict[str, callable] = {names.SYNONYM_REPLACEMENT: EDA.batch_synonym_replacement,
-                                                             names.RANDOM_DELETION: EDA.batch_random_deletion,
-                                                             names.RANDOM_SWAP: EDA.batch_random_swap,
-                                                             names.RANDOM_INSERTION: EDA.batch_random_insertion}
+TEXT_DATA_AUGMENTATION_DICT: Dict[str, callable] = {names.SYNONYM_REPLACEMENT: EDA.batch_synonym_replacement,
+                                                    names.RANDOM_DELETION: EDA.batch_random_deletion,
+                                                    names.RANDOM_SWAP: EDA.batch_random_swap,
+                                                    names.RANDOM_INSERTION: EDA.batch_random_insertion}
