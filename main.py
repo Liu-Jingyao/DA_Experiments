@@ -24,7 +24,7 @@ running_config = environment_config = dataset_config = model_config = dict()
 logging.basicConfig(level=logging.NOTSET)
 logger = logging.getLogger('main')
 logging.disable(logging.DEBUG)
-logging.disable(logging.WARNING)
+transformers.utils.logging.set_verbosity_warning()
 
 def init_project():
     # load configuration files
@@ -47,11 +47,9 @@ def init_project():
         os.environ['HTTP_PROXY'] = os.environ['HTTPS_PROXY'] = PROXY_DICT[environment_config['environment']]
 
     # init random seeds
-    np.random.seed(SEED)
-    random.seed(SEED)
-    torch.manual_seed(SEED)
+    transformers.set_seed(SEED)
     torch.backends.cudnn.deterministic = True
-
+    torch.backends.cudnn.benchmark = False
 
 if __name__ == '__main__':
     init_project()
@@ -129,33 +127,32 @@ if __name__ == '__main__':
     test_dataset = dataset['test']
 
     # feature_space augmentation
-    feature_augmentation_names = [aug['name'] for aug in feature_augmentations]
-    if len(feature_augmentations):
-        assert len(feature_augmentations) <= 1, f'feature augmentations num={len(feature_augmentations)}>1'
-        assert running_config['model'] in feature_augmentations[0]['support_models'],\
-            f'{feature_augmentations[0]["name"]} do not support {running_config["model"]} model'
-        if 'exinfo' in feature_augmentations[0].keys():
-            exinfo = feature_augmentations[0]['exinfo']
+    for feature_augmentation in feature_augmentations:
+        if 'exinfo' in feature_augmentation.keys():
+            exinfo = feature_augmentation['exinfo']
             preprocess = CUSTOM_MODEL_PREPROCESS_DICT[exinfo]
             parameters_may_need = {
                 'token_field': 'input_ids',
                 'tfidf_preprocess': TFIDFPreProcess(train_dataset, vocab_size=len(tokenizer), p=0.025)
                 if exinfo == names.DROPOUT_PROB else None,
             }
-            dataset = dataset.map(lambda batch: preprocess(batch, 'input_ids'), batched=True,
+            train_dataset = train_dataset.map(lambda batch: preprocess(batch, **parameters_may_need), batched=True,
                                   batch_size=running_config['map_batch_size'],
                                   **({'load_from_cache_file': False} if (big_dataset or bool(text_augmentations)) else {}))
             tokenizer.model_input_names += [exinfo]
+    cur_feature_augmentation_names = [aug['name'] for aug in feature_augmentations]
+    feature_augmentation_flags = {aug_name: aug_name in cur_feature_augmentation_names for aug_name in names.FEATURE_DATA_AUGMENTATIONS}
+    logger.info(feature_augmentation_flags)
 
     # define model, metrics, loss func and train model
     if model_config['pretrained']:
         checkpoint = model_config['checkpoint']
         model_config = CUSTOM_MODEL_CONFIG_CLASS_DICT[running_config['model']].from_pretrained(checkpoint, num_labels=dataset_config['class_num'],
-                                                                                               aug_ops=feature_augmentation_names)
+                                                                                               aug_ops=feature_augmentation_flags)
         model = CUSTOM_MODEL_CLASS_DICT[running_config['model']].from_pretrained(checkpoint, config=model_config, mirror='tuna')
     else:
         model_config = CUSTOM_MODEL_CONFIG_CLASS_DICT[running_config['model']](vocab_size=len(tokenizer), num_labels=dataset_config['class_num'],
-                                                                               aug_ops=feature_augmentation_names)
+                                                                               aug_ops=feature_augmentation_flags)
         model = CUSTOM_MODEL_CLASS_DICT[running_config['model']](model_config)
 
     def compute_metrics(eval_preds):

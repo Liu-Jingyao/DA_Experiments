@@ -7,11 +7,18 @@ import numpy
 import numpy as np
 
 import torch
-from transformers import DistilBertForSequenceClassification
+from transformers import DistilBertForSequenceClassification, DistilBertConfig
 
 from data_augmentations.tfidf_word_dropout import TFIDFPreProcess
+from models.Base import BaseConfig
 from models.DistilBERT import DistilBERTForSequenceClassification
 
 if __name__ == '__main__':
-  model = DistilBertForSequenceClassification.from_pretrained('distilbert-base-uncased')
-  model
+  import logging
+
+  logging.basicConfig(level=logging.NOTSET)
+  logger = logging.getLogger('main')
+  logging.disable(logging.DEBUG)
+  # logging.disable(logging.WARNING)
+
+  logger.info({'a': 1})

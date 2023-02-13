@@ -22,7 +22,7 @@ class CNN(PreTrainedModel, ABC):
     def __init__(self, config):
         super().__init__(config)
 
-        self.tfidf_word_dropout_flag = config.tfidf_word_dropout_flag
+        self.tfidf_word_dropout_flag = config.aug_ops[names.TFIDF_WORD_DROPOUT]
 
         self.embedding = torch.nn.Embedding(self.config.vocab_size, self.config.embedding_dim)
         self.convs = torch.nn.ModuleList([
@@ -34,9 +34,8 @@ class CNN(PreTrainedModel, ABC):
         self.fc = torch.nn.Linear(len(self.config.filter_sizes) * self.config.n_filters, self.config.output_dim)
         self.dropout = torch.nn.Dropout(self.config.dropout)
 
-    def forward(self, input_ids, labels, **kwargs):
+    def forward(self, input_ids, labels, dropout_prob, **kwargs):
         if self.training and self.tfidf_word_dropout_flag:
-            dropout_prob = kwargs[names.DROPOUT_PROB]
             keep = torch.bernoulli(1 - dropout_prob).bool()
             input_ids = torch.where(keep, input_ids, torch.empty_like(input_ids).fill_(0))
 

@@ -20,7 +20,7 @@ class TFIDFPreProcess:
             self.idf[int(k)] += v
 
     @staticmethod
-    def batch_preprocess(batch, tfidf_preprocess):
+    def batch_preprocess(batch, tfidf_preprocess, **kwargs):
         dropout_prob = []
         for text in tqdm(batch['input_ids'], desc="Calculating dataset dropout prob"):
             dropout_prob += [tfidf_preprocess.get_text_dropout_prob(text)]

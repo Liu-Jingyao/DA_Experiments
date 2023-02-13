@@ -6,7 +6,7 @@ from typing import Optional, Tuple, Union, List
 import torch
 from torch import nn
 from torch.nn import MSELoss, CrossEntropyLoss, BCEWithLogitsLoss
-from transformers import PretrainedConfig, DistilBertModel, BatchEncoding
+from transformers import PretrainedConfig, DistilBertModel, BatchEncoding, DistilBertConfig
 from transformers.modeling_outputs import BaseModelOutput, SequenceClassifierOutput
 from transformers.models.distilbert.modeling_distilbert import Embeddings, TransformerBlock, \
     Transformer, create_sinusoidal_embeddings, DistilBertForSequenceClassification
@@ -16,33 +16,35 @@ from models.Base import BaseConfig
 from utils import names
 
 
-class DistilBERTConfig(BaseConfig):
+class DistilBERTConfig(DistilBertConfig):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
+        self.aug_ops = None
 
 class DistilBERTForSequenceClassification(DistilBertForSequenceClassification, ABC):
     def __init__(self, config: PretrainedConfig, aug_ops=None):
         super().__init__(config)
         self.distilbert = DistilBERT(config)
-        self.keyword_enhance_flag = config.keyword_enhance_flag
-        self.tfidf_word_dropout_flag = config.tfidf_word_dropout_flag
 
     def forward(self, input_ids: Optional[torch.Tensor] = None, attention_mask: Optional[torch.Tensor] = None,
+                tfidfs: Optional[torch.Tensor] = None, keyword_ids: Optional[torch.Tensor] = None,
+                dropout_prob: Optional[torch.Tensor] = None,
                 head_mask: Optional[torch.Tensor] = None, inputs_embeds: Optional[torch.Tensor] = None,
                 labels: Optional[torch.LongTensor] = None, output_attentions: Optional[bool] = None,
-                output_hidden_states: Optional[bool] = None, return_dict: Optional[bool] = None, **kwargs) -> Union[
+                output_hidden_states: Optional[bool] = None, return_dict: Optional[bool] = None) -> Union[
         SequenceClassifierOutput, Tuple[torch.Tensor, ...]]:
         return_dict = return_dict if return_dict is not None else self.config.use_return_dict
 
         distilbert_output = self.distilbert(
             input_ids=input_ids,
             attention_mask=attention_mask,
+            keyword_ids=keyword_ids,
+            dropout_prob=dropout_prob,
             head_mask=head_mask,
             inputs_embeds=inputs_embeds,
             output_attentions=output_attentions,
             output_hidden_states=output_hidden_states,
             return_dict=return_dict,
-            **kwargs
         )
         hidden_state = distilbert_output[0]  # (bs, seq_len, dim)
         pooled_output = hidden_state[:, 0]  # (bs, dim)
@@ -88,15 +90,21 @@ class DistilBERTForSequenceClassification(DistilBertForSequenceClassification, A
 class DistilBERT(DistilBertModel, ABC):
     def __init__(self, config: PretrainedConfig):
         super().__init__(config)
+
+        self.keyword_enhance_flag = config.aug_ops[names.KEYWORD_ENHANCE]
+        self.tfidf_word_dropout_flag = config.aug_ops[names.TFIDF_WORD_DROPOUT]
+
         self.embeddings = KeywordEnhancedEmbeddings(config)
         self.transformer = KeywordEnhancedTransformer(config)
         if self.keyword_enhance_flag:
             self.keyword_bert_model = None
 
     def forward(self, input_ids: Optional[torch.Tensor] = None,  attention_mask: Optional[torch.Tensor] = None,
+                tfidfs: Optional[torch.Tensor] = None, keyword_ids: Optional[torch.Tensor] = None,
+                dropout_prob: Optional[torch.Tensor] = None,
                 head_mask: Optional[torch.Tensor] = None, inputs_embeds: Optional[torch.Tensor] = None,
                 output_attentions: Optional[bool] = None, output_hidden_states: Optional[bool] = None,
-                return_dict: Optional[bool] = None, **kwargs) -> Union[BaseModelOutput, Tuple[torch.Tensor, ...]]:
+                return_dict: Optional[bool] = None) -> Union[BaseModelOutput, Tuple[torch.Tensor, ...]]:
         # Note: when adding parameter, add it to KeywordEnhancedBertForSequenceClassification.forward, too!
 
         # lazy load
@@ -105,10 +113,8 @@ class DistilBERT(DistilBertModel, ABC):
                                                                       num_labels=self.config.num_labels,
                                                                       mirror='tuna', ).cuda()
         if self.keyword_enhance_flag:
-            keyword_ids = kwargs.get(names.KEYWORD_IDS, None)
             keyword_hidden_state = self.keyword_bert_model(input_ids=keyword_ids[:, :1]).last_hidden_state
         if self.training and self.tfidf_word_dropout_flag:
-            dropout_prob = kwargs.get(names.DROPOUT_PROB, None)
             keep = torch.bernoulli(1 - dropout_prob).bool()
             input_ids = torch.where(keep, input_ids, torch.empty_like(input_ids).fill_(0))
 
@@ -186,6 +192,7 @@ class KeywordEnhancedEmbeddings(nn.Module):
 class KeywordEnhancedTransformer(Transformer):
     def __init__(self, config: PretrainedConfig):
         super().__init__(config)
+        self.config = config
         module_list = [TransformerBlock(config) for _ in range(config.n_layers)]
         self.layer = nn.ModuleList(module_list)
 
@@ -207,7 +214,7 @@ class KeywordEnhancedTransformer(Transformer):
             )
             hidden_state = layer_outputs[-1]
 
-            if self.config.keyword_enhance_flag and i == 0:
+            if self.config.aug_ops[names.KEYWORD_ENHANCE] and i == 0:
                 hidden_state = hidden_state + ex_hidden_state * 0.1
 
             if output_attentions:

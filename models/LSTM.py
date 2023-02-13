@@ -23,7 +23,7 @@ class LSTM(PreTrainedModel, ABC):
     def __init__(self, config):
         super().__init__(config)
 
-        self.tfidf_word_dropout_flag = self.config.tfidf_word_dropout_flag
+        self.tfidf_word_dropout_flag = self.config.aug_ops[names.TFIDF_WORD_DROPOUT]
 
         self.embedding = torch.nn.Embedding(config.vocab_size, config.embedding_dim)
         self.lstm = torch.nn.LSTM(config.embedding_dim, config.hidden_dim, config.n_layers, bidirectional=config.bidirectional,
@@ -31,9 +31,8 @@ class LSTM(PreTrainedModel, ABC):
         self.fc = torch.nn.Linear(config.hidden_dim * 2 if config.bidirectional else config.hidden_dim, config.output_dim)
         self.dropout = torch.nn.Dropout(config.dropout_rate)
 
-    def forward(self, input_ids, labels=None, **kwargs):
+    def forward(self, input_ids, labels=None, dropout_prob=None, **kwargs):
         if self.training and self.tfidf_word_dropout_flag:
-            dropout_prob = kwargs.get(names.DROPOUT_PROB, None)
             keep = torch.bernoulli(1 - dropout_prob).bool()
             input_ids = torch.where(keep, input_ids, torch.empty_like(input_ids).fill_(0))
 
