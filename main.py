@@ -1,4 +1,6 @@
 import sys
+
+import numpy
 import yaml
 import torch
 import random
@@ -6,12 +8,23 @@ import datasets
 import evaluate
 import numpy as np
 import transformers
+import logging
+
+from tqdm import tqdm
 from transformers import IntervalStrategy
-from utils import *
+
+from data_augmentations.tfidf_word_dropout import TFIDFPreProcess
+from utils.consts import *
+from utils.data_utils import get_custom_tokenizer
 
 task_name = sys.argv[1] if len(sys.argv) > 1 else 'default'
 running_config_list = augmentation_config_list = list()
 running_config = environment_config = dataset_config = model_config = dict()
+# logging.root.setLevel(logging.NOTSET)
+logging.basicConfig(level=logging.NOTSET)
+logger = logging.getLogger('main')
+logging.disable(logging.DEBUG)
+logging.disable(logging.WARNING)
 
 def init_project():
     # load configuration files
@@ -26,8 +39,9 @@ def init_project():
         running_config = running_config_list[1][task_name]
         model_config = yaml.safe_load(f_model_configs)[running_config['model']]
         dataset_config = yaml.safe_load(f_dataset_configs)[running_config['dataset']]
-        augmentation_config_list = [aug for aug in yaml.safe_load(f_augmentation_configs)
-                                    if aug['name'] in running_config['augmentations']]
+        augmentation_config_list = yaml.safe_load(f_augmentation_configs)
+        augmentation_config_list = [aug for aug_name in running_config['augmentations'] for aug in augmentation_config_list
+                                     if aug['name'] == aug_name]
     # init system proxy
     if environment_config['environment'] != 'local':
         os.environ['HTTP_PROXY'] = os.environ['HTTPS_PROXY'] = PROXY_DICT[environment_config['environment']]
@@ -50,7 +64,8 @@ if __name__ == '__main__':
     else:
         dataset = dataset.shuffle(seed=SEED)
     train_size = dataset_config['splits']['train'] if big_dataset else dataset['train'].num_rows
-    eval_size = 2_500 # if 'validation' not in dataset.keys() else dataset['validation'].num_rows
+    eval_size = 2_500 if 'validation' not in dataset.keys() else dataset['validation'].num_rows
+
     # split train-validation set
     if 'validation' not in dataset.keys():
         if big_dataset:
@@ -63,55 +78,88 @@ if __name__ == '__main__':
             dataset['train'] = dataset_clean.pop('train')
             dataset['validation'] = dataset_clean.pop('test')
         train_size = train_size - eval_size
+
     # concat text title with content
     if 'title_field' in dataset_config.keys():
         dataset = dataset.map(lambda batch: {dataset_config['text_field']:
                                                  [f"{title}\n{text}"
                                                   for title in batch[dataset_config['title_field']]
-                                                  for text in batch[dataset_config['text_field']]]}, batched=True)
+                                                  for text in batch[dataset_config['text_field']]]}, batched=True, batch_size=running_config['map_batch_size'])
     # change the label_field name
     if dataset_config['label_field'] != 'label':
         dataset = dataset.rename_column(dataset_config['label_field'], 'label')
-    # check whether the label is starting from 0 and the growth rate is 1
+    # check whether the label is starting from 0 and the increase rate is 1
     if 'label_dict' in dataset_config.keys():
          dataset = dataset.map(lambda batch: {'label': [dataset_config['label_dict'][ori_label]
-                                                        for ori_label in batch['label']]}, batched=True)
+                                                        for ori_label in batch['label']]}, batched=True, batch_size=running_config['map_batch_size'])
 
-    # text_space augmentation, inserted before the original data
     text_augmentations = [aug for aug in augmentation_config_list if aug['space'] == 'text']
     feature_augmentations = [aug for aug in augmentation_config_list if aug['space'] == 'feature']
 
-    for aug_config in text_augmentations:
-        data_augmentation = DATA_AUGMENTATION_DICT[aug_config['name']](text_field=dataset_config['text_field'])
-        dataset = dataset.map(data_augmentation.embedding, batched=True)
-        aug_dataset = dataset.map(data_augmentation.transforms, batched=True)
-        if aug_config['quality'] == 'low':
-            dataset = datasets.concatenate_datasets([dataset, aug_dataset])
-        else:
-            dataset = datasets.concatenate_datasets([dataset, aug_dataset])
+    # text_space augmentation
+    if len(text_augmentations):
+        dataset_list = [dataset['train']]
+        for augmentation_config in text_augmentations:
+            logger.info(f"processing {augmentation_config['name']}")
+            data_augmentation = DATA_AUGMENTATION_DICT[augmentation_config['name']]
+            aug_dataset = dataset['train'].map(lambda batch: data_augmentation(batch, dataset_config['text_field']), batched=True, batch_size=running_config['map_batch_size'])
+
+            if augmentation_config['quality'] == 'low':
+                dataset_list.insert(0, aug_dataset)
+            else:
+                dataset_list.append(aug_dataset)
+            logger.info(f"{augmentation_config['name']} down.\n"
+                        f"example: origin_text='{aug_dataset[0]['origin_text']}',"
+                        f" aug_text='{aug_dataset[0][dataset_config['text_field']]}'")
+
+        dataset['train'] = datasets.concatenate_datasets(dataset_list)
+        train_size = dataset['train'] * len(dataset_list)
 
 
     # tokenize
     tokenizer = transformers.AutoTokenizer.from_pretrained(model_config.get('checkpoint', "distilbert-base-uncased"))
-    dataset = dataset.map(lambda batch:
-                                    tokenizer(batch[dataset_config['text_field']], truncation=True), batched=True)
+    tokenizer = get_custom_tokenizer(tokenizer)
+    dataset = dataset.map(lambda batch: tokenizer(batch[dataset_config['text_field']], truncation=True)
+                          , batched=True, batch_size=running_config['map_batch_size'], **({'load_from_cache_file': False} if big_dataset or bool(text_augmentations) else {}))
     data_collator = transformers.DataCollatorWithPadding(tokenizer=tokenizer)
 
+    # split dataset
+    train_dataset = dataset['train']
+    validation_dataset = dataset['validation']
+    test_dataset = dataset['test']
+
     # feature_space augmentation
+    feature_augmentation_names = [aug['name'] for aug in feature_augmentations]
     if len(feature_augmentations):
-        assert len(feature_augmentations) <= 1
-        assert feature_augmentations[0]['model'] == running_config['model']
-        running_config['model'] = feature_augmentations[0]['name']
+        assert len(feature_augmentations) <= 1, f'feature augmentations num={len(feature_augmentations)}>1'
+        assert running_config['model'] in feature_augmentations[0]['support_models'],\
+            f'{feature_augmentations[0]["name"]} do not support {running_config["model"]} model'
+        if 'exinfo' in feature_augmentations[0].keys():
+            exinfo = feature_augmentations[0]['exinfo']
+            preprocess = CUSTOM_MODEL_PREPROCESS_DICT[exinfo]
+            parameters_may_need = {
+                'token_field': 'input_ids',
+                'tfidf_preprocess': TFIDFPreProcess(train_dataset, vocab_size=len(tokenizer), p=0.025)
+                if exinfo == names.DROPOUT_PROB else None,
+            }
+            dataset = dataset.map(lambda batch: preprocess(batch, 'input_ids'), batched=True,
+                                  batch_size=running_config['map_batch_size'],
+                                  **({'load_from_cache_file': False} if (big_dataset or bool(text_augmentations)) else {}))
+            tokenizer.model_input_names += [exinfo]
 
     # define model, metrics, loss func and train model
-    if len(feature_augmentations) and model_config['pretrained']:
+    if model_config['pretrained']:
         checkpoint = model_config['checkpoint']
-        model = CUSTOM_MODEL_CLASS_DICT[running_config['model']].from_pretrained(checkpoint, num_labels=dataset_config['class_num'], tokenizer=tokenizer)
-    elif model_config['pretrained']:
-        checkpoint = model_config['checkpoint']
-        model = transformers.AutoModelForSequenceClassification.from_pretrained(checkpoint, num_labels=dataset_config['class_num'])
+        model_config = CUSTOM_MODEL_CONFIG_CLASS_DICT[running_config['model']].from_pretrained(checkpoint,
+                                                                                               aug_ops=feature_augmentation_names)
+        model = CUSTOM_MODEL_CLASS_DICT[running_config['model']].from_pretrained(checkpoint,
+                                                                                 config=model_config,
+                                                                                 num_labels=dataset_config['class_num'],
+                                                                                 mirror='tuna')
     else:
-        model_config = CUSTOM_MODEL_CONFIG_CLASS_DICT[running_config['model']](num_labels=dataset_config['class_num'])
+        model_config = CUSTOM_MODEL_CONFIG_CLASS_DICT[running_config['model']](vocab_size=len(tokenizer),
+                                                                               aug_ops=feature_augmentation_names,
+                                                                               num_labels=dataset_config['class_num'])
         model = CUSTOM_MODEL_CLASS_DICT[running_config['model']](model_config)
 
     def compute_metrics(eval_preds):
@@ -119,15 +167,25 @@ if __name__ == '__main__':
         logits, labels = eval_preds
         predictions = np.argmax(logits, axis=-1)
         return metric.compute(predictions=predictions, references=labels)
-    train_args = transformers.TrainingArguments("trainer", report_to=['tensorboard'], max_steps=train_size * running_config['epochs'] // 8,
-                                                save_strategy=IntervalStrategy.STEPS, save_steps=running_config['save_steps'],
-                                                evaluation_strategy=IntervalStrategy.STEPS, eval_steps=running_config['eval_steps'],
-                                                logging_strategy=IntervalStrategy.STEPS, logging_steps=running_config['logging_steps'],
-                                                load_best_model_at_end=True, metric_for_best_model='accuracy', seed=SEED)
+
     if big_dataset:
-        dataset['train'] = dataset['train'].with_format('torch')
-        dataset['validation'] = dataset['validation'].with_format('torch')
-    trainer = transformers.Trainer(model, train_args, train_dataset=dataset['train'],
-                                   eval_dataset=dataset['validation'],
+        training_params = {'max_steps': train_size * running_config['epochs'] // running_config['batch_size'],
+                           'evaluation_strategy': IntervalStrategy.STEPS,
+                           'eval_steps': running_config['eval_steps']}
+    else:
+        training_params = {'num_train_epochs': running_config['epochs'],
+                           'evaluation_strategy': IntervalStrategy.EPOCH}
+
+    train_args = transformers.TrainingArguments("trainer", seed=SEED,
+                                                per_device_train_batch_size=running_config['batch_size'],
+                                                per_device_eval_batch_size=running_config['batch_size'],
+                                                **training_params,
+                                                logging_strategy=IntervalStrategy.STEPS, logging_steps=running_config['logging_steps'],
+                                                report_to=['tensorboard'], save_strategy=IntervalStrategy.NO,)
+    if big_dataset:
+        train_dataset = train_dataset.with_format('torch')
+        validation_dataset = validation_dataset.with_format('torch')
+    trainer = transformers.Trainer(model, train_args, train_dataset=train_dataset,
+                                   eval_dataset=validation_dataset,
                                    data_collator=data_collator, compute_metrics=compute_metrics)
     trainer.train()

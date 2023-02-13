@@ -3,3 +3,7 @@ distilbert:
   checkpoint: "distilbert-base-uncased"
 cnn:
   pretrained: false
+lstm:
+  pretrained: false
+rnn:
+  pretrained: false

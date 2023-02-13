@@ -1,11 +1,25 @@
+import collections
+import copy
+
+import datasets
+import math
+import numpy
+import numpy as np
+
 import torch
-from transformers import DistilBertTokenizerFast, AutoModelForSequenceClassification, AutoTokenizer
 
-checkpoint = "distilbert-base-uncased-finetuned-sst-2-english"
-tokenizer = AutoTokenizer.from_pretrained("distilbert-base-uncased")
-model = AutoModelForSequenceClassification.from_pretrained(checkpoint)
-sequences = ["happy"]
+from data_augmentations.tfidf_word_dropout import TFIDFPreProcess
 
-# tokens = DistilBertTokenizerFast.convert_tokens_to_ids(tokenizer, sequences)
-t = torch.Tensor([1,1,1])[None, :]
-print(t.squeeze())
+
+
+if __name__ == '__main__':
+  bs = 32
+  sent_len = 512  # Max len of padded sentences
+  V = 4000  # Vocab size
+  input = numpy.random.randint(0, V, (bs, sent_len))
+  dataset = datasets.Dataset.from_dict({'input_ids': input})
+  m = TFIDFPreProcess(dataset['input_ids'], p=0.1)
+  dataset = dataset.with_format('torch')
+  output = m(dataset['input_ids'])
+  print(input)
+  print(output)

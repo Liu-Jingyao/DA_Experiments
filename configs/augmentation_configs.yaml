@@ -1,4 +1,29 @@
-- name: 'modifier-enhance'
+- name: 'keyword_enhance'
   space: 'feature'
   quality: 'high'
-  model: 'distilbert'
+  exinfo: 'tfidfs'
+
+- name: 'random_word_dropout'
+  space: 'feature'
+  quality: 'low'
+
+- name: 'tfidf_word_dropout'
+  space: 'feature'
+  quality: 'low'
+  exinfo: 'dropout_prob'
+
+- name: 'synonym_replacement'
+  space: 'text'
+  quality: 'high'
+
+- name: 'random_deletion'
+  space: 'text'
+  quality: 'low'
+
+- name: 'random_swap'
+  space: 'text'
+  quality: 'low'
+
+- name: 'random_insertion'
+  space: 'text'
+  quality: 'high'

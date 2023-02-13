@@ -1,14 +1,15 @@
 # environment_params
 
-environment: 'neimeng' # vpn, local, quanzhou, neimeng
+environment: 'beijing' # vpn, local, quanzhou, neimeng, beijing
 ---
 
 # running_configs
 default:
   dataset: 'sst-2' # sst-2, imdb, rotten_tomatoes, sentiment140, yelp-5, amazon-5
-  model: 'distilbert'
-  augmentations: []
-  epochs: 3
-  save_steps: 1000
-  eval_steps: 100
-  logging_steps: 100
+  model: 'distilbert' # cnn, distilbert, lstm, rnn
+  augmentations: [] # keyword_enhance, synonym_replacement, random_deletion, random_swap, random_insertion
+  epochs: 20
+  batch_size: 512 # 32/256
+  map_batch_size: 500000
+  eval_steps: 200 # 1000/200
+  logging_steps: 100 # 100/100

@@ -1,6 +1,10 @@
 scikit-learn
 git+https://github.com/huggingface/transformers
-datasets
+git+https://github.com/huggingface/datasets
 evaluate
 pyyaml
 sagemaker
+gensim
+"dill<0.3.5"
+nvidia-ml-py3
+nltk
