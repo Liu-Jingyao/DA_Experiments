@@ -1,11 +1,3 @@
-sst-2:
-  dataset: 'glue'
-  subset: 'sst2'
-  loading_way: 'huggingface'
-  text_field: 'sentence'
-  label_field: 'label'
-  splits: {'train': 67349, 'validation': 872, 'test': 1821}
-  class_num: 2
 imdb:
   dataset: 'imdb'
   loading_way: 'huggingface'
@@ -20,18 +12,6 @@ rotten_tomatoes:
   label_field: 'label'
   splits: {'train': 8530, 'validation': 1066, 'test': 1066}
   class_num: 2
-sentiment140:
-  dataset: 'sentiment140'
-  loading_way: 'huggingface'
-  text_field: 'text'
-  label_field: 'sentiment'
-  splits: {'train': 1600000, 'test': 498}
-  class_num: 3
-  stream_load: true
-  label_dict:
-    0: 0
-    2: 1
-    4: 2
 yelp-5:
   dataset: 'yelp_review_full'
   loading_way: 'huggingface'

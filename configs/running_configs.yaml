@@ -1,15 +1,423 @@
 # environment_params
 
-environment: 'beijing' # vpn, local, quanzhou, neimeng, beijing
+environment: 'local' # vpn, local, quanzhou, neimeng, beijing
 ---
 
 # running_configs
 default:
-  dataset: 'sst-2' # sst-2, imdb, rotten_tomatoes, sentiment140, yelp-5, amazon-5
+  dataset: 'rotten_tomatoes' # imdb, rotten_tomatoes, yelp-5, amazon-5
   model: 'lstm' # cnn, distilbert, lstm, rnn
-  augmentations: ['tfidf_word_dropout'] # keyword_enhance, tfidf_word_dropout, synonym_replacement, random_deletion, random_swap, random_insertion
-  epochs: 20
-  batch_size: 512 # 32/256
+  augmentations: ['loss_based_replacement'] # keyword_enhance, random_word_dropout, tfidf_word_dropout, synonym_replacement,
+                                        # random_deletion, random_swap, random_insertion,
+                                        # hidden_state_pooling, hidden_state_cnn
+  aug_params: [0.5] #0.005, dont remain blank, 0.5
+  epochs: 10
+  batch_size: 32 # 32
   map_batch_size: 500000
   eval_steps: 200 # 1000/200
   logging_steps: 100 # 100/100
+  ignore_cache: true
+  repeat_num: 2
+
+#task1:
+#  dataset: 'rotten_tomatoes'
+#  model: 'distilbert'
+#  augmentations: []
+#  aug_params: []
+#  epochs: 2
+#  batch_size: 32
+#  map_batch_size: 500000
+#  eval_steps: 200
+#  logging_steps: 100
+#  ignore_cache: true
+#  repeat_num: 2
+
+#task2:
+#  dataset: 'amazon-5'
+#  model: 'distilbert'
+#  augmentations: []
+#  aug_params: []
+#  epochs: 1
+#  batch_size: 32
+#  map_batch_size: 500000
+#  eval_steps: 200
+#  logging_steps: 100
+#  ignore_cache: true
+#  repeat_num: 1
+
+#task3:
+#  dataset: 'rotten_tomatoes'
+#  model: 'distilbert'
+#  augmentations: ['random_word_dropout']
+#  aug_params: [0.005]
+#  epochs: 2
+#  batch_size: 32
+#  map_batch_size: 500000
+#  eval_steps: 200
+#  logging_steps: 100
+#  ignore_cache: true
+#  repeat_num: 2
+
+#task4:
+#  dataset: 'amazon-5'
+#  model: 'distilbert'
+#  augmentations: ['random_word_dropout']
+#  aug_params: [0.005]
+#  epochs: 1
+#  batch_size: 32
+#  map_batch_size: 500000
+#  eval_steps: 200
+#  logging_steps: 100
+#  ignore_cache: true
+#  repeat_num: 1
+
+#task5:
+#  dataset: 'rotten_tomatoes'
+#  model: 'distilbert'
+#  augmentations: ['tfidf_word_dropout']
+#  aug_params: [0.005]
+#  epochs: 2
+#  batch_size: 32
+#  map_batch_size: 500000
+#  eval_steps: 200
+#  logging_steps: 100
+#  ignore_cache: true
+#  repeat_num: 2
+
+#task6:
+#  dataset: 'amazon-5'
+#  model: 'distilbert'
+#  augmentations: ['tfidf_word_dropout']
+#  aug_params: [0.005]
+#  epochs: 1
+#  batch_size: 32
+#  map_batch_size: 500000
+#  eval_steps: 200
+#  logging_steps: 100
+#  ignore_cache: true
+#  repeat_num: 1
+
+#task7:
+#  dataset: 'rotten_tomatoes'
+#  model: 'distilbert'
+#  augmentations: ['synonym_replacement']
+#  aug_params: [0.5]
+#  epochs: 2
+#  batch_size: 32
+#  map_batch_size: 500000
+#  eval_steps: 200
+#  logging_steps: 100
+#  ignore_cache: true
+#  repeat_num: 2
+
+#task8:
+#  dataset: 'amazon-5'
+#  model: 'distilbert'
+#  augmentations: ['synonym_replacement']
+#  aug_params: [0.5]
+#  epochs: 1
+#  batch_size: 32
+#  map_batch_size: 500000
+#  eval_steps: 200
+#  logging_steps: 100
+#  ignore_cache: true
+#  repeat_num: 1
+
+#task9:
+#  dataset: 'rotten_tomatoes'
+#  model: 'distilbert'
+#  augmentations: ['loss_based_replacement']
+#  aug_params: [0.5]
+#  epochs: 2
+#  batch_size: 32
+#  map_batch_size: 500000
+#  eval_steps: 200
+#  logging_steps: 100
+#  ignore_cache: true
+#  repeat_num: 2
+
+#task10:
+#  dataset: 'amazon-5'
+#  model: 'distilbert'
+#  augmentations: ['loss_based_replacement']
+#  aug_params: [0.5]
+#  epochs: 1
+#  batch_size: 32
+#  map_batch_size: 500000
+#  eval_steps: 200
+#  logging_steps: 100
+#  ignore_cache: true
+#  repeat_num: 1
+
+#task11:
+#  dataset: 'rotten_tomatoes'
+#  model: 'lstm'
+#  augmentations: []
+#  aug_params: []
+#  epochs: 10
+#  batch_size: 32
+#  map_batch_size: 500000
+#  eval_steps: 200
+#  logging_steps: 100
+#  ignore_cache: true
+#  repeat_num: 2
+
+#task12:
+#  dataset: 'amazon-5'
+#  model: 'lstm'
+#  augmentations: []
+#  aug_params: []
+#  epochs: 1
+#  batch_size: 32
+#  map_batch_size: 500000
+#  eval_steps: 200
+#  logging_steps: 100
+#  ignore_cache: true
+#  repeat_num: 1
+
+#task13:
+#  dataset: 'rotten_tomatoes'
+#  model: 'lstm'
+#  augmentations: ['random_word_dropout']
+#  aug_params: [0.005]
+#  epochs: 10
+#  batch_size: 32
+#  map_batch_size: 500000
+#  eval_steps: 200
+#  logging_steps: 100
+#  ignore_cache: true
+#  repeat_num: 2
+
+task14:
+  dataset: 'amazon-5'
+  model: 'lstm'
+  augmentations: ['random_word_dropout']
+  aug_params: [0.005]
+  epochs: 1
+  batch_size: 32
+  map_batch_size: 500000
+  eval_steps: 200
+  logging_steps: 100
+  ignore_cache: true
+  repeat_num: 1
+
+#task15:
+#  dataset: 'rotten_tomatoes'
+#  model: 'lstm'
+#  augmentations: ['tfidf_word_dropout']
+#  aug_params: [0.005]
+#  epochs: 10
+#  batch_size: 32
+#  map_batch_size: 500000
+#  eval_steps: 200
+#  logging_steps: 100
+#  ignore_cache: true
+#  repeat_num: 2
+
+#task16:
+#  dataset: 'amazon-5'
+#  model: 'lstm'
+#  augmentations: ['tfidf_word_dropout']
+#  aug_params: [0.005]
+#  epochs: 1
+#  batch_size: 32
+#  map_batch_size: 500000
+#  eval_steps: 200
+#  logging_steps: 100
+#  ignore_cache: true
+#  repeat_num: 1
+
+#task17:
+#  dataset: 'rotten_tomatoes'
+#  model: 'lstm'
+#  augmentations: ['synonym_replacement']
+#  aug_params: [0.5]
+#  epochs: 10
+#  batch_size: 32
+#  map_batch_size: 500000
+#  eval_steps: 200
+#  logging_steps: 100
+#  ignore_cache: true
+#  repeat_num: 2
+
+#task18:
+#  dataset: 'amazon-5'
+#  model: 'lstm'
+#  augmentations: ['synonym_replacement']
+#  aug_params: [0.5]
+#  epochs: 1
+#  batch_size: 32
+#  map_batch_size: 500000
+#  eval_steps: 200
+#  logging_steps: 100
+#  ignore_cache: true
+#  repeat_num: 1
+
+#task19:
+#  dataset: 'rotten_tomatoes'
+#  model: 'lstm'
+#  augmentations: ['loss_based_replacement']
+#  aug_params: [0.5]
+#  epochs: 10
+#  batch_size: 32
+#  map_batch_size: 500000
+#  eval_steps: 200
+#  logging_steps: 100
+#  ignore_cache: true
+#  repeat_num: 2
+
+#task20:
+#  dataset: 'amazon-5'
+#  model: 'lstm'
+#  augmentations: ['loss_based_replacement']
+#  aug_params: [0.5]
+#  epochs: 1
+#  batch_size: 32
+#  map_batch_size: 500000
+#  eval_steps: 200
+#  logging_steps: 100
+#  ignore_cache: true
+#  repeat_num: 1
+
+#task21:
+#  dataset: 'rotten_tomatoes'
+#  model: 'cnn'
+#  augmentations: []
+#  aug_params: []
+#  epochs: 10
+#  batch_size: 32
+#  map_batch_size: 500000
+#  eval_steps: 200
+#  logging_steps: 100
+#  ignore_cache: true
+#  repeat_num: 1
+#
+#task22:
+#  dataset: 'amazon-5'
+#  model: 'cnn'
+#  augmentations: []
+#  aug_params: []
+#  epochs: 1
+#  batch_size: 32
+#  map_batch_size: 500000
+#  eval_steps: 200
+#  logging_steps: 100
+#  ignore_cache: true
+#  repeat_num: 1
+
+#task23:
+#  dataset: 'rotten_tomatoes'
+#  model: 'cnn'
+#  augmentations: ['random_word_dropout']
+#  aug_params: [0.005]
+#  epochs: 10
+#  batch_size: 32
+#  map_batch_size: 500000
+#  eval_steps: 200
+#  logging_steps: 100
+#  ignore_cache: true
+#  repeat_num: 1
+
+task24:
+  dataset: 'amazon-5'
+  model: 'cnn'
+  augmentations: ['random_word_dropout']
+  aug_params: [0.005]
+  epochs: 1
+  batch_size: 32
+  map_batch_size: 500000
+  eval_steps: 200
+  logging_steps: 100
+  ignore_cache: true
+  repeat_num: 1
+
+#task25:
+#  dataset: 'rotten_tomatoes'
+#  model: 'cnn'
+#  augmentations: ['tfidf_word_dropout']
+#  aug_params: [0.005]
+#  epochs: 10
+#  batch_size: 32
+#  map_batch_size: 500000
+#  eval_steps: 200
+#  logging_steps: 100
+#  ignore_cache: true
+#  repeat_num: 1
+
+task26:
+  dataset: 'amazon-5'
+  model: 'cnn'
+  augmentations: ['tfidf_word_dropout']
+  aug_params: [0.005]
+  epochs: 1
+  batch_size: 32
+  map_batch_size: 500000
+  eval_steps: 200
+  logging_steps: 100
+  ignore_cache: true
+  repeat_num: 1
+
+#task27:
+#  dataset: 'rotten_tomatoes'
+#  model: 'cnn'
+#  augmentations: ['synonym_replacement']
+#  aug_params: [0.5]
+#  epochs: 10
+#  batch_size: 32
+#  map_batch_size: 500000
+#  eval_steps: 200
+#  logging_steps: 100
+#  ignore_cache: true
+#  repeat_num: 1
+
+#task18:
+#  dataset: 'amazon-5'
+#  model: 'lstm'
+#  augmentations: ['synonym_replacement']
+#  aug_params: [0.5]
+#  epochs: 1
+#  batch_size: 32
+#  map_batch_size: 500000
+#  eval_steps: 200
+#  logging_steps: 100
+#  ignore_cache: true
+#  repeat_num: 1
+
+#task29:
+#  dataset: 'rotten_tomatoes'
+#  model: 'cnn'
+#  augmentations: ['loss_based_replacement']
+#  aug_params: [0.5]
+#  epochs: 10
+#  batch_size: 32
+#  map_batch_size: 500000
+#  eval_steps: 200
+#  logging_steps: 100
+#  ignore_cache: true
+#  repeat_num: 1
+
+#task20:
+#  dataset: 'amazon-5'
+#  model: 'lstm'
+#  augmentations: ['loss_based_replacement']
+#  aug_params: [0.5]
+#  epochs: 1
+#  batch_size: 32
+#  map_batch_size: 500000
+#  eval_steps: 200
+#  logging_steps: 100
+#  ignore_cache: true
+#  repeat_num: 1
+
+task30:
+  dataset: 'rotten_tomatoes'
+  model: 'distilbert'
+  augmentations: ['random_deletion']
+  aug_params: [0.005]
+  epochs: 2
+  batch_size: 32
+  map_batch_size: 500000
+  eval_steps: 200
+  logging_steps: 100
+  ignore_cache: true
+  repeat_num: 2

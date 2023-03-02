@@ -41,7 +41,7 @@ class RNN(PreTrainedModel, ABC):
             keep = torch.bernoulli(1 - dropout_prob).bool()
             input_ids = torch.where(keep, input_ids, torch.empty_like(input_ids).fill_(0))
         if self.training and self.random_word_dropout_flag:
-            keep = torch.empty_like(input_ids).bernoulli(1 - 0.025).bool()
+            keep = torch.empty_like(input_ids).bernoulli(1 - self.random_word_dropout_flag).bool()
             input_ids = torch.where(keep, input_ids, torch.empty_like(input_ids).fill_(0))
         embedded = self.embedding(input_ids)
         embedded = self.dropout(embedded)

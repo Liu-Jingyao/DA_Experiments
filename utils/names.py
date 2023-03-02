@@ -1,14 +1,20 @@
 # environment names
+LOCAL = 'local'
 VPN = 'vpn'
 QUAN_ZHOU = 'quanzhou'
 NEI_MENG = 'neimeng'
 BEI_JING = 'beijing'
+NAN_JING = 'nanjing'
 
 # aug names
 KEYWORD_ENHANCE = 'keyword_enhance'
 RANDOM_WORD_DROPOUT = 'random_word_dropout'
 TFIDF_WORD_DROPOUT = 'tfidf_word_dropout'
-FEATURE_DATA_AUGMENTATIONS = [KEYWORD_ENHANCE, RANDOM_WORD_DROPOUT, TFIDF_WORD_DROPOUT]
+HIDDEN_STATE_POOLING = 'hidden_state_pooling'
+HIDDEN_STATE_CNN = 'hidden_state_cnn'
+LOSS_BASED_REPLACEMENT = 'loss_based_replacement'
+FEATURE_DATA_AUGMENTATIONS = [KEYWORD_ENHANCE, RANDOM_WORD_DROPOUT, TFIDF_WORD_DROPOUT, HIDDEN_STATE_POOLING, HIDDEN_STATE_CNN,
+                              LOSS_BASED_REPLACEMENT]
 
 RANDOM_DELETION = 'random_deletion'
 RANDOM_SWAP = 'random_swap'

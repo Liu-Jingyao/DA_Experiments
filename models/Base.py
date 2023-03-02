@@ -1,4 +1,4 @@
-from transformers import PretrainedConfig
+from transformers import PretrainedConfig, DistilBertTokenizerFast
 
 from utils import names
 

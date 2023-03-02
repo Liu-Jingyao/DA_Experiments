@@ -3,15 +3,17 @@ import os
 from abc import ABC
 from typing import Optional, Tuple, Union, List
 
+import numpy
 import torch
 from torch import nn
 from torch.nn import MSELoss, CrossEntropyLoss, BCEWithLogitsLoss
 from transformers import PretrainedConfig, DistilBertModel, BatchEncoding, DistilBertConfig
 from transformers.modeling_outputs import BaseModelOutput, SequenceClassifierOutput
 from transformers.models.distilbert.modeling_distilbert import Embeddings, TransformerBlock, \
-    Transformer, create_sinusoidal_embeddings, DistilBertForSequenceClassification
+    Transformer, create_sinusoidal_embeddings, DistilBertForSequenceClassification, MultiHeadSelfAttention
 import transformers
 
+from data_augmentations.loss_based_replacement import loss_based_replacement
 from models.Base import BaseConfig
 from utils import names
 
@@ -20,11 +22,38 @@ class DistilBERTConfig(DistilBertConfig):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.aug_ops = None
+        self.seq_len = None
 
 class DistilBERTForSequenceClassification(DistilBertForSequenceClassification, ABC):
-    def __init__(self, config: PretrainedConfig, aug_ops=None):
+    def __init__(self, config: PretrainedConfig):
         super().__init__(config)
         self.distilbert = DistilBERT(config)
+        self.hidden_state_pooling_flag = config.aug_ops[names.HIDDEN_STATE_POOLING]
+        self.loss_based_replacement_flag = self.config.aug_ops[names.LOSS_BASED_REPLACEMENT]
+
+        if self.hidden_state_pooling_flag:
+            self.config.output_hidden_states = True
+            self.attention_pool = MultiHeadSelfAttention(config)
+            Wh = torch.FloatTensor(1, config.n_layers, device=self.device)
+            self.Wh = torch.nn.Parameter(nn.init.xavier_uniform_(Wh, gain=nn.init.calculate_gain('relu')))
+            q = torch.FloatTensor(1, device=self.device)
+            self.q = torch.nn.Parameter(nn.init.uniform(q))
+        self.hidden_state_cnn_flag = config.aug_ops[names.HIDDEN_STATE_CNN]
+        if self.hidden_state_cnn_flag:
+            self.config.output_hidden_states = True
+            self.convs = torch.nn.Sequential(
+                torch.nn.Conv2d(7, 7, (3, 3)),
+                torch.nn.ReLU(),
+                torch.nn.Conv2d(7, 7, (4, 4)),
+                torch.nn.ReLU(),
+                torch.nn.MaxPool2d(2),
+                torch.nn.Conv2d(7, 7, (5, 5)),
+                torch.nn.ReLU(),
+                torch.nn.MaxPool2d(2),
+                torch.nn.Conv2d(7, 7, (13, 1)),
+                torch.nn.ReLU()
+            )
+            self.fc = torch.nn.Linear(188, self.config.dim)
 
     def forward(self, input_ids: Optional[torch.Tensor] = None, attention_mask: Optional[torch.Tensor] = None,
                 tfidfs: Optional[torch.Tensor] = None, keyword_ids: Optional[torch.Tensor] = None,
@@ -34,6 +63,59 @@ class DistilBERTForSequenceClassification(DistilBertForSequenceClassification, A
                 output_hidden_states: Optional[bool] = None, return_dict: Optional[bool] = None) -> Union[
         SequenceClassifierOutput, Tuple[torch.Tensor, ...]]:
         return_dict = return_dict if return_dict is not None else self.config.use_return_dict
+
+        if self.training and self.loss_based_replacement_flag and self.loss_based_replacement_flag > numpy.random.random():
+            def current_model_loss(text, label, inner_attention_mask):
+                with torch.no_grad():
+                    tokenizer = self.tokenizer
+                    inner_input_ids = torch.tensor([tokenizer(text, padding='max_length', truncation=True, max_length=tokenizer.max_length)['input_ids']], device=self.device)
+                    inner_labels = torch.tensor([label], device=self.device)
+
+                    inner_model = copy.deepcopy(self.distilbert).cuda()
+                    inner_pre_classifier = copy.deepcopy(self.pre_classifier).cuda()
+                    inner_dropout = copy.deepcopy(self.dropout).cuda()
+                    inner_classifier = copy.deepcopy(self.classifier).cuda()
+
+
+                    inner_model_output = inner_model(
+                        input_ids=inner_input_ids,
+                        attention_mask=inner_attention_mask,
+                        head_mask=head_mask,
+                        output_attentions=output_attentions,
+                        output_hidden_states=output_hidden_states,
+                        return_dict=return_dict,
+                    )
+                    inner_hidden_state = inner_model_output[0]  # (bs, embed_len, dim)
+                    inner_pooled_output = inner_hidden_state[:, 0]  # (bs, dim)
+                    inner_pooled_output = inner_pre_classifier(inner_pooled_output)  # (bs, dim)
+                    inner_pooled_output = nn.ReLU()(inner_pooled_output)  # (bs, dim)
+                    inner_pooled_output = inner_dropout(inner_pooled_output)  # (bs, dim)
+                    inner_logits = inner_classifier(inner_pooled_output)  # (bs, num_labels)
+                    inner_criterion = torch.nn.CrossEntropyLoss()
+                    inner_loss = inner_criterion(inner_logits, inner_labels)
+                return inner_loss
+
+            tokenizer = self.tokenizer
+            texts = []
+            for ids in input_ids:
+                texts.append(tokenizer.convert_tokens_to_string(tokenizer.convert_ids_to_tokens(ids)))
+
+            def aug_transform(text, label, inner_attention_mask):
+                split_text = text.split()
+                split_text = split_text[1: split_text.index('[SEP]')]
+                text = " ".join(split_text)
+                new_text = loss_based_replacement(text, label, current_model_loss, inner_attention_mask)
+                return new_text
+
+            os.environ["TOKENIZERS_PARALLELISM"] = "false"
+
+            import gevent
+            jobs = [gevent.spawn(aug_transform, text, labels[i], attention_mask[i]) for i, text in enumerate(texts)]
+            gevent.joinall(jobs)
+            new_texts = [job.value for job in jobs]
+
+            input_ids = torch.tensor(tokenizer(new_texts, padding='max_length', truncation=True, max_length=tokenizer.max_length)['input_ids'], device=self.device)
+
 
         distilbert_output = self.distilbert(
             input_ids=input_ids,
@@ -46,12 +128,35 @@ class DistilBERTForSequenceClassification(DistilBertForSequenceClassification, A
             output_hidden_states=output_hidden_states,
             return_dict=return_dict,
         )
-        hidden_state = distilbert_output[0]  # (bs, seq_len, dim)
-        pooled_output = hidden_state[:, 0]  # (bs, dim)
-        pooled_output = self.pre_classifier(pooled_output)  # (bs, dim)
+        hidden_state = distilbert_output[0]  # (bs, embed_len, dim)
+
+        if self.hidden_state_pooling_flag:
+            batch_size = input_ids.size(0)
+            all_hidden_states = torch.stack(distilbert_output[1])  # (layer_num, bs, seq_len, dim)
+            all_hidden_states = all_hidden_states.transpose(0, 1)  # (bs, layer_num, seq_len, dim)
+            hcls = all_hidden_states[:,1:,0,:] # (bs, layer_num, dim)
+            Wh = torch.broadcast_to(self.Wh, (batch_size, self.Wh.size(0), self.Wh.size(1)))
+            q = torch.broadcast_to(self.q, (batch_size, hcls.size(1),hcls.size(2)))
+            sa_output = self.attention_pool(
+                query=q,
+                key=hcls,
+                value=hcls,
+                mask=torch.ones((hcls.size(0),1,1,hcls.size(1)), device=self.device)
+            ) # (bs, layer_num, dim)
+            sa_output = sa_output[0]
+            hidden_state = torch.matmul(Wh, sa_output) # (bs, layer_num, dim)
+
+        if self.hidden_state_cnn_flag:
+            x = self.convs(torch.stack(distilbert_output[1]).transpose(0, 1))
+            pooled_output = self.fc(x.squeeze())
+        else:
+            pooled_output = hidden_state[:, 0]  # (bs, dim)
+            pooled_output = self.pre_classifier(pooled_output)  # (bs, dim)
+
         pooled_output = nn.ReLU()(pooled_output)  # (bs, dim)
         pooled_output = self.dropout(pooled_output)  # (bs, dim)
         logits = self.classifier(pooled_output)  # (bs, num_labels)
+
 
         loss = None
         if labels is not None:
@@ -82,9 +187,7 @@ class DistilBERTForSequenceClassification(DistilBertForSequenceClassification, A
 
         return SequenceClassifierOutput(
             loss=loss,
-            logits=logits,
-            hidden_states=distilbert_output.hidden_states,
-            attentions=distilbert_output.attentions,
+            logits=logits
         ) # Encoder
 
 class DistilBERT(DistilBertModel, ABC):
@@ -136,12 +239,12 @@ class DistilBERT(DistilBertModel, ABC):
         device = input_ids.device if input_ids is not None else inputs_embeds.device
 
         if attention_mask is None:
-            attention_mask = torch.ones(input_shape, device=device)  # (bs, seq_length)
+            attention_mask = torch.ones(input_shape, device=device)  # (bs, embed_length)
         # Prepare head mask if needed
         head_mask = self.get_head_mask(head_mask, self.config.num_hidden_layers)
 
         if inputs_embeds is None:
-            inputs_embeds = self.embeddings(input_ids)  # (bs, seq_length, dim)
+            inputs_embeds = self.embeddings(input_ids)  # (bs, embed_length, dim)
 
         hidden_states = self.transformer.forward(
             x=inputs_embeds,

@@ -15,10 +15,13 @@ import data_augmentations.EDA as EDA
 SEED = 42
 os.environ['CUDA_LAUNCH_BLOCKING'] = '1'
 ROOT_PATH = os.path.dirname(os.path.abspath("main.py"))
+CACHE_DIR = os.path.join(ROOT_PATH, 'datasets')
+LOG_PATH = os.path.join(ROOT_PATH, 'logs')
 PROXY_DICT = {names.VPN: 'http://127.0.0.1:7890',
               names.QUAN_ZHOU: 'http://10.55.146.88:12798',
               names.NEI_MENG: 'http://192.168.1.174:12798',
-              names.BEI_JING: 'http://100.72.64.19:12798'}
+              names.BEI_JING: 'http://100.72.64.19:12798',
+              names.NAN_JING: 'http://172.181.217.43:12798'}
 
 # component dicts
 

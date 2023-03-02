@@ -1,3 +1,4 @@
+import copy
 import random
 from random import shuffle
 from typing import Dict, List
@@ -186,30 +187,45 @@ def eda(sentence, alpha_sr=0, alpha_ri=0, alpha_rs=0, p_rd=0, num_aug=1):
 
     return augmented_sentences
 
-
 def batch_synonym_replacement(batch, text_field):
-    res = [eda(text, alpha_sr=0.1) for text in batch[text_field]]
-    batch[text_field] = [_[0] for _ in res]
-    batch['origin_text'] = [_[-1] for _ in res]
+    aug_batch = []
+    wordclean = WordClean()
+    for sentence in batch[text_field]:
+        if random.random() < 0.5:
+            sentence = wordclean(sentence)
+            words = sentence.split(' ')
+            words = [word for word in words if word != '']
+            a_words = synonym_replacement(words, 1)
+            aug_batch.append(' '.join(a_words))
+        else:
+            aug_batch.append(sentence)
+
+    batch['original_text'] = copy.deepcopy(batch[text_field])
+    batch[text_field] = aug_batch
     return batch
 
+# def batch_synonym_replacement(batch, text_field):
+#     res = [eda(text, alpha_sr=0.1) for text in batch[text_field]]
+#     batch[text_field] = [_[0] for _ in res]
+#     batch['original_text'] = [_[-1] for _ in res]
+#     return batch
 
 def batch_random_deletion(batch, text_field):
-    res = [eda(text, p_rd=0.1) for text in batch[text_field]]
+    res = [eda(text, p_rd=0.005) for text in batch[text_field]]
     batch[text_field] = [_[0] for _ in res]
-    batch['origin_text'] = [_[-1] for _ in res]
+    batch['original_text'] = [_[-1] for _ in res]
     return batch
 
 
 def batch_random_swap(batch, text_field):
     res = [eda(text, alpha_rs=0.1) for text in batch[text_field]]
     batch[text_field] = [_[0] for _ in res]
-    batch['origin_text'] = [_[-1] for _ in res]
+    batch['original_text'] = [_[-1] for _ in res]
     return batch
 
 
 def batch_random_insertion(batch, text_field):
     res = [eda(text, alpha_ri=0.1) for text in batch[text_field]]
     batch[text_field] = [_[0] for _ in res]
-    batch['origin_text'] = [_[-1] for _ in res]
+    batch['original_text'] = [_[-1] for _ in res]
     return batch

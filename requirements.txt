@@ -8,3 +8,4 @@ gensim
 "dill<0.3.5"
 nvidia-ml-py3
 nltk
+gevent

@@ -1,1 +1,4 @@
 /trainer/
+/datasets/*
+/logs/*
+/datasets/

@@ -12,6 +12,14 @@
   quality: 'low'
   exinfo: 'dropout_prob'
 
+- name: 'hidden_state_pooling'
+  space: 'feature'
+  quality: 'high'
+
+- name: 'hidden_state_cnn'
+  space: 'feature'
+  quality: 'high'
+
 - name: 'synonym_replacement'
   space: 'text'
   quality: 'high'
@@ -26,4 +34,8 @@
 
 - name: 'random_insertion'
   space: 'text'
+  quality: 'high'
+
+- name: 'loss_based_replacement'
+  space: 'feature'
   quality: 'high'
