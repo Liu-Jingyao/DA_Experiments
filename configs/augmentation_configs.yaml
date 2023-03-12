@@ -39,3 +39,15 @@
 - name: 'loss_based_replacement'
   space: 'feature'
   quality: 'high'
+
+- name: 'pred_based_replacement'
+  space: 'feature'
+  quality: 'high'
+
+- name: 'pred_loss_replacement'
+  space: 'feature'
+  quality: 'high'
+
+- name: 'online_random_replacement'
+  space: 'feature'
+  quality: 'high'

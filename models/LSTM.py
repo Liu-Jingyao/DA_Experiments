@@ -15,7 +15,10 @@ import torch.nn
 from transformers import PreTrainedModel, PretrainedConfig, DistilBertTokenizerFast
 from transformers.utils import ModelOutput
 
+from data_augmentations.EDA import synonym_replacement
 from data_augmentations.loss_based_replacement import loss_based_replacement
+from data_augmentations.pred_based_replacement import pred_based_replacement
+from data_augmentations.pred_loss_replacement import pred_loss_replacement
 from models.Base import BaseConfig
 
 
@@ -42,6 +45,9 @@ class LSTM(PreTrainedModel, ABC):
         self.tfidf_word_dropout_flag = self.config.aug_ops[names.TFIDF_WORD_DROPOUT]
         self.random_word_dropout_flag = self.config.aug_ops[names.RANDOM_WORD_DROPOUT]
         self.loss_based_replacement_flag = self.config.aug_ops[names.LOSS_BASED_REPLACEMENT]
+        self.pred_based_replacement_flag = self.config.aug_ops[names.PRED_BASED_REPLACEMENT]
+        self.pred_loss_replacement_flag = self.config.aug_ops[names.PRED_LOSS_REPLACEMENT]
+        self.online_random_replacement_flag = self.config.aug_ops[names.ONLINE_RANDOM_REPLACEMENT]
 
         self.embedding = torch.nn.Embedding(config.vocab_size, config.embedding_dim)
         self.lstm = torch.nn.LSTM(config.embedding_dim, config.hidden_dim, config.n_layers,
@@ -103,6 +109,128 @@ class LSTM(PreTrainedModel, ABC):
             new_texts = [job.value for job in jobs]
 
             input_ids = torch.tensor(tokenizer(new_texts, padding='max_length', truncation=True, max_length=tokenizer.max_length)['input_ids'], device=self.device)
+
+        if self.training and self.pred_based_replacement_flag and self.pred_based_replacement_flag > numpy.random.random():
+            def current_model_pred(text, label):
+                with torch.no_grad():
+                    tokenizer = self.tokenizer
+                    inner_embedding = copy.deepcopy(self.embedding).cuda()
+                    inner_dropout = copy.deepcopy(self.dropout).cuda()
+                    inner_lstm = copy.deepcopy(self.lstm).cuda()
+                    inner_fc = copy.deepcopy(self.fc).cuda()
+
+                    inner_input_ids = torch.tensor([tokenizer(text, padding='max_length', truncation=True,
+                                                              max_length=tokenizer.max_length)['input_ids']],
+                                                   device=self.device)
+                    inner_embedded = inner_embedding(inner_input_ids)
+                    inner_embedded = inner_dropout(inner_embedded)
+                    inner_labels = torch.tensor([label], device=self.device)
+
+                    output, (hidden, cell) = inner_lstm(inner_embedded)
+                    if self.lstm.bidirectional:
+                        hidden = inner_dropout(torch.cat([hidden[-1], hidden[-2]], dim=-1))
+                    else:
+                        hidden = inner_dropout(hidden[-1])
+                    logits = inner_dropout(inner_fc(hidden))
+                    pred = torch.nn.functional.softmax(logits)# (bs, num_labels)
+                    pred = (pred[:, inner_labels])
+                return pred
+
+            tokenizer = self.tokenizer
+            texts = []
+            for ids in input_ids:
+                texts.append(tokenizer.convert_tokens_to_string(tokenizer.convert_ids_to_tokens(ids)))
+
+            def aug_transform(text, label):
+                split_text = text.split()
+                split_text = split_text[1: split_text.index('[SEP]')]
+                text = " ".join(split_text)
+                new_text = pred_based_replacement(text, label, current_model_pred)
+                return new_text
+
+            os.environ["TOKENIZERS_PARALLELISM"] = "false"
+
+            import gevent
+            jobs = [gevent.spawn(aug_transform, text, labels[i]) for i, text in enumerate(texts)]
+            gevent.joinall(jobs)
+            new_texts = [job.value for job in jobs]
+
+            input_ids = torch.tensor(tokenizer(new_texts, padding='max_length', truncation=True, max_length=tokenizer.max_length)['input_ids'], device=self.device)
+
+        if self.training and self.pred_loss_replacement_flag and self.pred_loss_replacement_flag > numpy.random.random():
+            def current_model_pred_loss(text, label):
+                with torch.no_grad():
+                    tokenizer = self.tokenizer
+                    inner_embedding = copy.deepcopy(self.embedding).cuda()
+                    inner_dropout = copy.deepcopy(self.dropout).cuda()
+                    inner_lstm = copy.deepcopy(self.lstm).cuda()
+                    inner_fc = copy.deepcopy(self.fc).cuda()
+
+                    inner_input_ids = torch.tensor([tokenizer(text, padding='max_length', truncation=True,
+                                                              max_length=tokenizer.max_length)['input_ids']],
+                                                   device=self.device)
+                    inner_embedded = inner_embedding(inner_input_ids)
+                    inner_embedded = inner_dropout(inner_embedded)
+                    inner_labels = torch.tensor([label], device=self.device)
+
+                    output, (hidden, cell) = inner_lstm(inner_embedded)
+                    if self.lstm.bidirectional:
+                        hidden = inner_dropout(torch.cat([hidden[-1], hidden[-2]], dim=-1))
+                    else:
+                        hidden = inner_dropout(hidden[-1])
+                    logits = inner_dropout(inner_fc(hidden))
+                    pred = torch.nn.functional.softmax(logits)  # (bs, num_labels)
+                    pred = (pred[:, inner_labels])
+                    criterion = torch.nn.CrossEntropyLoss()
+                    loss = criterion(logits, inner_labels)
+                return pred, loss
+
+            tokenizer = self.tokenizer
+            texts = []
+            for ids in input_ids:
+                texts.append(tokenizer.convert_tokens_to_string(tokenizer.convert_ids_to_tokens(ids)))
+
+            def aug_transform(text, label):
+                split_text = text.split()
+                split_text = split_text[1: split_text.index('[SEP]')]
+                text = " ".join(split_text)
+                new_text = pred_loss_replacement(text, label, current_model_pred_loss)
+                return new_text
+
+            os.environ["TOKENIZERS_PARALLELISM"] = "false"
+
+            import gevent
+            jobs = [gevent.spawn(aug_transform, text, labels[i]) for i, text in enumerate(texts)]
+            gevent.joinall(jobs)
+            new_texts = [job.value for job in jobs]
+
+            input_ids = torch.tensor(
+                tokenizer(new_texts, padding='max_length', truncation=True, max_length=tokenizer.max_length)[
+                    'input_ids'], device=self.device)
+
+        if self.training and self.online_random_replacement_flag and self.online_random_replacement_flag > numpy.random.random():
+            tokenizer = self.tokenizer
+            texts = []
+            for ids in input_ids:
+                texts.append(tokenizer.convert_tokens_to_string(tokenizer.convert_ids_to_tokens(ids)))
+
+            def aug_transform(text):
+                split_text = text.split()
+                split_text = split_text[1: split_text.index('[SEP]')]
+                text = " ".join(split_text)
+                new_text = " ".join(synonym_replacement(text.split(), 1))
+                return new_text
+
+            os.environ["TOKENIZERS_PARALLELISM"] = "false"
+
+            import gevent
+            jobs = [gevent.spawn(aug_transform, text) for i, text in enumerate(texts)]
+            gevent.joinall(jobs)
+            new_texts = [job.value for job in jobs]
+
+            input_ids = torch.tensor(
+                tokenizer(new_texts, padding='max_length', truncation=True, max_length=tokenizer.max_length)[
+                    'input_ids'], device=self.device)
 
         embedded = self.embedding(input_ids)
         embedded = self.dropout(embedded)

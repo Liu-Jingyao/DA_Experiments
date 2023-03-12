@@ -198,7 +198,7 @@ def batch_synonym_replacement(batch, text_field):
             a_words = synonym_replacement(words, 1)
             aug_batch.append(' '.join(a_words))
         else:
-            aug_batch.append(sentence)
+            aug_batch.append(wordclean(sentence))
 
     batch['original_text'] = copy.deepcopy(batch[text_field])
     batch[text_field] = aug_batch

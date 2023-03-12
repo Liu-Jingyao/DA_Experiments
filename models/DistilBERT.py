@@ -13,7 +13,10 @@ from transformers.models.distilbert.modeling_distilbert import Embeddings, Trans
     Transformer, create_sinusoidal_embeddings, DistilBertForSequenceClassification, MultiHeadSelfAttention
 import transformers
 
+from data_augmentations.EDA import synonym_replacement
 from data_augmentations.loss_based_replacement import loss_based_replacement
+from data_augmentations.pred_based_replacement import pred_based_replacement
+from data_augmentations.pred_loss_replacement import pred_loss_replacement
 from models.Base import BaseConfig
 from utils import names
 
@@ -30,6 +33,9 @@ class DistilBERTForSequenceClassification(DistilBertForSequenceClassification, A
         self.distilbert = DistilBERT(config)
         self.hidden_state_pooling_flag = config.aug_ops[names.HIDDEN_STATE_POOLING]
         self.loss_based_replacement_flag = self.config.aug_ops[names.LOSS_BASED_REPLACEMENT]
+        self.pred_based_replacement_flag = self.config.aug_ops[names.PRED_BASED_REPLACEMENT]
+        self.pred_loss_replacement_flag = self.config.aug_ops[names.PRED_LOSS_REPLACEMENT]
+        self.online_random_replacement_flag = self.config.aug_ops[names.ONLINE_RANDOM_REPLACEMENT]
 
         if self.hidden_state_pooling_flag:
             self.config.output_hidden_states = True
@@ -104,7 +110,7 @@ class DistilBERTForSequenceClassification(DistilBertForSequenceClassification, A
                 split_text = text.split()
                 split_text = split_text[1: split_text.index('[SEP]')]
                 text = " ".join(split_text)
-                new_text = loss_based_replacement(text, label, current_model_loss, inner_attention_mask)
+                new_text = loss_based_replacement(text, label, current_model_pred, inner_attention_mask)
                 return new_text
 
             os.environ["TOKENIZERS_PARALLELISM"] = "false"
@@ -116,6 +122,137 @@ class DistilBERTForSequenceClassification(DistilBertForSequenceClassification, A
 
             input_ids = torch.tensor(tokenizer(new_texts, padding='max_length', truncation=True, max_length=tokenizer.max_length)['input_ids'], device=self.device)
 
+        if self.training and self.pred_based_replacement_flag and self.pred_based_replacement_flag > numpy.random.random():
+            def current_model_pred(text, label, inner_attention_mask):
+                with torch.no_grad():
+                    tokenizer = self.tokenizer
+                    inner_input_ids = torch.tensor([tokenizer(text, padding='max_length', truncation=True, max_length=tokenizer.max_length)['input_ids']], device=self.device)
+                    inner_labels = torch.tensor([label], device=self.device)
+
+                    inner_model = copy.deepcopy(self.distilbert).cuda()
+                    inner_pre_classifier = copy.deepcopy(self.pre_classifier).cuda()
+                    inner_dropout = copy.deepcopy(self.dropout).cuda()
+                    inner_classifier = copy.deepcopy(self.classifier).cuda()
+
+
+                    inner_model_output = inner_model(
+                        input_ids=inner_input_ids,
+                        attention_mask=inner_attention_mask,
+                        head_mask=head_mask,
+                        output_attentions=output_attentions,
+                        output_hidden_states=output_hidden_states,
+                        return_dict=return_dict,
+                    )
+                    inner_hidden_state = inner_model_output[0]  # (bs, embed_len, dim)
+                    inner_pooled_output = inner_hidden_state[:, 0]  # (bs, dim)
+                    inner_pooled_output = inner_pre_classifier(inner_pooled_output)  # (bs, dim)
+                    inner_pooled_output = nn.ReLU()(inner_pooled_output)  # (bs, dim)
+                    inner_pooled_output = inner_dropout(inner_pooled_output)  # (bs, dim)
+                    inner_logits = inner_classifier(inner_pooled_output)
+                    inner_pred = torch.nn.functional.softmax(inner_logits)# (bs, num_labels)
+                    inner_pred = (inner_pred[:, inner_labels])
+                return inner_pred
+
+            tokenizer = self.tokenizer
+            texts = []
+            for ids in input_ids:
+                texts.append(tokenizer.convert_tokens_to_string(tokenizer.convert_ids_to_tokens(ids)))
+
+            def aug_transform(text, label, inner_attention_mask):
+                split_text = text.split()
+                split_text = split_text[1: split_text.index('[SEP]')]
+                text = " ".join(split_text)
+                new_text = pred_based_replacement(text, label, current_model_pred, inner_attention_mask)
+                return new_text
+
+            os.environ["TOKENIZERS_PARALLELISM"] = "false"
+
+            import gevent
+            jobs = [gevent.spawn(aug_transform, text, labels[i], attention_mask[i]) for i, text in enumerate(texts)]
+            gevent.joinall(jobs)
+            new_texts = [job.value for job in jobs]
+
+            input_ids = torch.tensor(tokenizer(new_texts, padding='max_length', truncation=True, max_length=tokenizer.max_length)['input_ids'], device=self.device)
+
+        if self.training and self.pred_loss_replacement_flag and self.pred_loss_replacement_flag > numpy.random.random():
+            def current_model_pred_loss(text, label, inner_attention_mask):
+                with torch.no_grad():
+                    tokenizer = self.tokenizer
+                    inner_input_ids = torch.tensor([tokenizer(text, padding='max_length', truncation=True, max_length=tokenizer.max_length)['input_ids']], device=self.device)
+                    inner_labels = torch.tensor([label], device=self.device)
+
+                    inner_model = copy.deepcopy(self.distilbert).cuda()
+                    inner_pre_classifier = copy.deepcopy(self.pre_classifier).cuda()
+                    inner_dropout = copy.deepcopy(self.dropout).cuda()
+                    inner_classifier = copy.deepcopy(self.classifier).cuda()
+
+
+                    inner_model_output = inner_model(
+                        input_ids=inner_input_ids,
+                        attention_mask=inner_attention_mask,
+                        head_mask=head_mask,
+                        output_attentions=output_attentions,
+                        output_hidden_states=output_hidden_states,
+                        return_dict=return_dict,
+                    )
+                    inner_hidden_state = inner_model_output[0]  # (bs, embed_len, dim)
+                    inner_pooled_output = inner_hidden_state[:, 0]  # (bs, dim)
+                    inner_pooled_output = inner_pre_classifier(inner_pooled_output)  # (bs, dim)
+                    inner_pooled_output = nn.ReLU()(inner_pooled_output)  # (bs, dim)
+                    inner_pooled_output = inner_dropout(inner_pooled_output)  # (bs, dim)
+                    inner_logits = inner_classifier(inner_pooled_output)
+
+                    inner_criterion = torch.nn.CrossEntropyLoss()
+                    inner_loss = inner_criterion(inner_logits, inner_labels)
+
+                    inner_pred = torch.nn.functional.softmax(inner_logits)# (bs, num_labels)
+                    inner_pred = (inner_pred[:, inner_labels])
+                return inner_pred, inner_loss
+
+            tokenizer = self.tokenizer
+            texts = []
+            for ids in input_ids:
+                texts.append(tokenizer.convert_tokens_to_string(tokenizer.convert_ids_to_tokens(ids)))
+
+            def aug_transform(text, label, inner_attention_mask):
+                split_text = text.split()
+                split_text = split_text[1: split_text.index('[SEP]')]
+                text = " ".join(split_text)
+                new_text = pred_loss_replacement(text, label, current_model_pred_loss, inner_attention_mask)
+                return new_text
+
+            os.environ["TOKENIZERS_PARALLELISM"] = "false"
+
+            import gevent
+            jobs = [gevent.spawn(aug_transform, text, labels[i], attention_mask[i]) for i, text in enumerate(texts)]
+            gevent.joinall(jobs)
+            new_texts = [job.value for job in jobs]
+
+            input_ids = torch.tensor(tokenizer(new_texts, padding='max_length', truncation=True, max_length=tokenizer.max_length)['input_ids'], device=self.device)
+
+        if self.training and self.online_random_replacement_flag and self.online_random_replacement_flag > numpy.random.random():
+            tokenizer = self.tokenizer
+            texts = []
+            for ids in input_ids:
+                texts.append(tokenizer.convert_tokens_to_string(tokenizer.convert_ids_to_tokens(ids)))
+
+            def aug_transform(text):
+                split_text = text.split()
+                split_text = split_text[1: split_text.index('[SEP]')]
+                text = " ".join(split_text)
+                new_text = " ".join(synonym_replacement(text.split(), 1))
+                return new_text
+
+            os.environ["TOKENIZERS_PARALLELISM"] = "false"
+
+            import gevent
+            jobs = [gevent.spawn(aug_transform, text) for i, text in enumerate(texts)]
+            gevent.joinall(jobs)
+            new_texts = [job.value for job in jobs]
+
+            input_ids = torch.tensor(
+                tokenizer(new_texts, padding='max_length', truncation=True, max_length=tokenizer.max_length)[
+                    'input_ids'], device=self.device)
 
         distilbert_output = self.distilbert(
             input_ids=input_ids,
