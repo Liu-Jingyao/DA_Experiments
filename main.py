@@ -52,11 +52,8 @@ if __name__ == '__main__':
         if model_config['pretrained']:
             checkpoint = model_config['checkpoint']
             config_obj = CUSTOM_MODEL_CONFIG_CLASS_DICT[running_config['model']].from_pretrained(checkpoint,
-                                                                                                 vocab_size=len(
-                                                                                                     my_tokenizer),
-                                                                                                 num_labels=
-                                                                                                 dataset_config[
-                                                                                                     'class_num'],
+                                                                                                 vocab_size=len(my_tokenizer),
+                                                                                                 num_labels=dataset_config['class_num'],
                                                                                                  aug_ops=dataset_helper.current_feature_augmentation_flags,
                                                                                                  seq_len=my_tokenizer.max_length)
             model = CUSTOM_MODEL_CLASS_DICT[running_config['model']].from_pretrained(checkpoint, config=config_obj,
