@@ -1,4 +1,6 @@
 import os
+import sys
+
 from transformers import PreTrainedModel, PretrainedConfig, DistilBertConfig
 from typing import Dict
 
@@ -14,9 +16,10 @@ import data_augmentations.EDA as EDA
 # environment vars
 SEED = 42
 os.environ['CUDA_LAUNCH_BLOCKING'] = '1'
-ROOT_PATH = os.path.dirname(os.path.abspath("main.py"))
+ROOT_PATH = os.path.dirname(sys.modules['__main__'].__file__)
 CACHE_DIR = os.path.join(ROOT_PATH, 'datasets')
 LOG_PATH = os.path.join(ROOT_PATH, 'logs')
+CONFIG_BASE_PATH = os.path.join(ROOT_PATH, "configs")
 PROXY_DICT = {names.VPN: 'http://127.0.0.1:7890',
               names.QUAN_ZHOU: 'http://10.55.146.88:12798',
               names.NEI_MENG: 'http://192.168.1.174:12798',

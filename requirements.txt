@@ -9,3 +9,5 @@ gensim
 nvidia-ml-py3
 nltk
 gevent
+peewee
+pymysql
