@@ -58,23 +58,23 @@ workflow_config:
     models: [ distilbert, cnn, lstm ]
     datasets: [ imdb, rotten_tomatoes, amazon-5, yelp-5 ]
     prob: 0.005
-  tfidf_word_dropout:
-    models: [ distilbert, cnn, lstm ]
-    datasets: [ imdb, rotten_tomatoes, amazon-5, yelp-5 ]
-    prob: 0.005
-  synonym_replacement:
-    models: [ distilbert, cnn, lstm ]
-    datasets: [ imdb, rotten_tomatoes, amazon-5, yelp-5 ]
-    prob: 0.25
-  online_random_replacement:
-    models: [ distilbert, lstm ]
-    datasets: [ imdb, rotten_tomatoes, amazon-5 ]
-    prob: 0.25
-  loss_based_replacement:
-    models: [ distilbert, lstm ]
-    datasets: [ imdb, rotten_tomatoes, amazon-5 ]
-    prob: 0.25
-  pred_loss_replacement:
-    models: [ distilbert, lstm ]
-    datasets: [ imdb, rotten_tomatoes, amazon-5 ]
-    prob: 0.25
+#  tfidf_word_dropout:
+#    models: [ distilbert, cnn, lstm ]
+#    datasets: [ imdb, rotten_tomatoes, amazon-5, yelp-5 ]
+#    prob: 0.005
+#  synonym_replacement:
+#    models: [ distilbert, cnn, lstm ]
+#    datasets: [ imdb, rotten_tomatoes, amazon-5, yelp-5 ]
+#    prob: 0.25
+#  online_random_replacement:
+#    models: [ distilbert, lstm ]
+#    datasets: [ imdb, rotten_tomatoes, amazon-5 ]
+#    prob: 0.25
+#  loss_based_replacement:
+#    models: [ distilbert, lstm ]
+#    datasets: [ imdb, rotten_tomatoes, amazon-5 ]
+#    prob: 0.25
+#  pred_loss_replacement:
+#    models: [ distilbert, lstm ]
+#    datasets: [ imdb, rotten_tomatoes, amazon-5 ]
+#    prob: 0.25

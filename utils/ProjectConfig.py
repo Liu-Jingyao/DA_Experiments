@@ -29,17 +29,19 @@ class ProjectConfig:
             workflow_config = self.running_config_list[2]['workflow_config']
 
             # generate workflow task list
-
-            for dataset in workflow_config['baseline']['datasets']:
-                for model in workflow_config['baseline']['models']:
-                    task_config = self.running_config_list[0].copy()
-                    task_epoch_num = self.running_config_list[2]['training_config'][model][dataset]['epochs']
-                    task_name = f"{model}_{dataset}_{task_epoch_num}epochs_baseline"
-                    task_config.update({'dataset': dataset, 'model': model,
-                                        'epochs': training_config[model][dataset]['epochs'],
-                                        'task_name': task_name})
-                    self.task_list.append(task_config)
-            workflow_config.pop('baseline')
+            if 'baseline' in workflow_config:
+                for dataset in workflow_config['baseline']['datasets']:
+                    for model in workflow_config['baseline']['models']:
+                        task_config = self.running_config_list[0].copy()
+                        task_epoch_num = self.running_config_list[2]['training_config'][model][dataset]['epochs']
+                        task_name = f"{model}_{dataset}_{task_epoch_num}epochs_baseline"
+                        task_config.update({'dataset': dataset, 'model': model,
+                                            'epochs': training_config[model][dataset]['epochs'],
+                                            'task_name': task_name,
+                                            'baseline': True,
+                                            'augmentations': [], 'aug_params': []})
+                        self.task_list.append(task_config)
+                workflow_config.pop('baseline')
 
             new_workflow_config = {}
             for aug, aug_dict in workflow_config.items():
@@ -65,7 +67,7 @@ class ProjectConfig:
                         task_name = f"{model}_{dataset}_{task_epoch_num}epochs_[{aug}_{aug_prob}]"
                         task_config.update({'dataset': dataset, 'model': model, 'augmentations': [aug],
                                             'aug_params': [aug_prob], 'epochs': training_config[model][dataset]['epochs'],
-                                           'task_name': task_name})
+                                           'task_name': task_name, 'baseline': False})
                         self.task_list.append(task_config)
         else: # single task
             task_config = self.running_config_list[0]
@@ -110,7 +112,6 @@ class ProjectConfig:
                 aug['prob'] = self.current_task_config['aug_params'][i]
             self.current_text_augmentations = [aug for aug in augmentation_config_list if aug['space'] == 'text']
             self.current_feature_augmentations = [aug for aug in augmentation_config_list if aug['space'] == 'feature']
-            self.current_baseline = not (self.current_text_augmentations or self.current_feature_augmentations)
 
             self.current_logger = logging.getLogger('my_project')
             self.current_logger.setLevel(logging.INFO)
@@ -124,10 +125,10 @@ class ProjectConfig:
             file_handler.setFormatter(formatter)
             self.current_logger.addHandler(file_handler)
             self.current_logger.addHandler(stdout_handler)
-            self.new_dataset = self.current_task_config['dataset'] == self.prev_dataset
-            self.new_aug = self.current_task_config['augmentations'] and self.current_task_config['augmentations'][0] == self.prev_aug
+            self.new_dataset = self.current_task_config['dataset'] != self.prev_dataset
+            self.new_aug = self.current_task_config['augmentations'] and self.current_task_config['augmentations'][0] != self.prev_aug
 
-            self.current_task_id += 1
+            self.current_task_id = self.current_task_id + 1
             self.prev_dataset = self.current_task_config['dataset']
             self.prev_aug = self.current_task_config['augmentations'][0] if self.current_task_config['augmentations'] else None
 

@@ -71,7 +71,7 @@ class TrainingHelper:
             self.accs.append(res['eval_accuracy'])
             self.f1s.append(res['eval_f1'])
             self.my_logger.info(res)
-            save_result(self.task_config, self.task_config.current_baseline, i, res['eval_f1'], res['eval_accuracy'])
+            save_result(self.task_config, i+1, res['eval_f1'], res['eval_accuracy'])
 
         acc = mean(self.accs)
         f1 = mean(self.f1s)
