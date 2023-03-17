@@ -5,7 +5,7 @@ from peewee import *
 
 from utils.ProjectConfig import ProjectConfig
 
-db = MySQLDatabase('experiment_data', host='82.157.53.138', port=3306, user='root', passwd='789556')
+db = MySQLDatabase()
 
 class Record(peewee.Model):
   id = peewee.AutoField(primary_key=True)
