@@ -22,10 +22,15 @@ if __name__ == '__main__':
 
     # running tasks
     dataset_helper = None
-    for task_config, model_config, dataset_config, text_augmentations, feature_augmentations, my_logger, is_new_dataset, is_new_aug in project_config:
+    for task_config, model_config, dataset_config, text_augmentations, feature_augmentations, my_logger, is_new_dataset, is_new_aug, is_new_model in project_config:
         my_logger.info(f"task_name: {task_config['task_name']}")
         load_map_from_cache = not project_config['ignore_cache']
         big_dataset = bool('stream_load' in dataset_config.keys())
+
+        if is_new_model and model_config['pretrained']:
+            # load new tokenizer
+            my_tokenizer = transformers.AutoTokenizer.from_pretrained(model_config['checkpoint'])
+            my_tokenizer = get_custom_tokenizer(my_tokenizer)
 
         if is_new_dataset:
             # load, preprocess and tokenize dataset
@@ -40,7 +45,6 @@ if __name__ == '__main__':
 
         # text augmentation
         if text_augmentations:
-            task_config['epochs'] = task_config['epochs'] // 2
             if is_new_aug:
                 dataset_helper.text_augmentation(text_augmentations, my_logger)
 

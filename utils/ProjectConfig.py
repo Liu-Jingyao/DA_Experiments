@@ -95,6 +95,8 @@ class ProjectConfig:
         self.new_dataset = None
         self.prev_aug = None
         self.new_aug = None
+        self.prev_model = None
+        self.new_model = None
 
     def __iter__(self):
         return self
@@ -128,9 +130,11 @@ class ProjectConfig:
             self.new_dataset = self.current_task_config['dataset'] != self.prev_dataset
             self.new_aug = self.current_task_config['augmentations'] and self.current_task_config['augmentations'][0] != self.prev_aug
             self.new_aug = self.new_aug or self.new_dataset
+            self.new_model = self.current_task_config['model'] != self.prev_model
 
             self.current_task_id = self.current_task_id + 1
             self.prev_dataset = self.current_task_config['dataset']
+            self.prev_model = self.current_task_config['model']
             self.prev_aug = self.current_task_config['augmentations'][0] if self.current_task_config['augmentations'] else None
 
             return (self.current_task_config,
@@ -140,7 +144,8 @@ class ProjectConfig:
                     self.current_feature_augmentations,
                     self.current_logger,
                     self.new_dataset,
-                    self.new_aug)
+                    self.new_aug,
+                    self.new_model)
 
         raise StopIteration()
 

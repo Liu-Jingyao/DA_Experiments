@@ -7,3 +7,15 @@ lstm:
   pretrained: false
 rnn:
   pretrained: false
+roberta:
+  pretrained: true
+  checkpoint: "roberta-base"
+albert:
+  pretrained: true
+  checkpoint: "albert-base-v2"
+xlnet:
+  pretrained: true
+  checkpoint: "xlnet-base-cased"
+electra:
+  pretrained: true
+  checkpoint: "google/electra-base-discriminator"

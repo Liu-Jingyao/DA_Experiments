@@ -112,6 +112,8 @@ class DatasetHelper:
             self.dataset_dict['train'] = self.train_dataset = self.train_dataset.map(lambda batch: preprocess(batch, **parameters_may_need), batched=True,
                                               batch_size=self.map_batch_size,
                                               load_from_cache_file=False)
+            # duplicate dataset
+            self.dataset_dict['train'] = self.train_dataset = datasets.concatenate_datasets([self.train_dataset, self.train_dataset])
             my_tokenizer.model_input_names += [exinfo]
             my_logger.info(f"{feature_augmentation['name']} down.")
         my_logger.info(self.current_feature_augmentation_flags)

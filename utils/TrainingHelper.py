@@ -57,7 +57,8 @@ class TrainingHelper:
                                                                                                   num_labels=self.dataset_config['class_num'],
                                                                                                   aug_ops=self.dataset_helper.current_feature_augmentation_flags,
                                                                                                   seq_len=self.my_tokenizer.max_length)
-                model = CUSTOM_MODEL_CLASS_DICT[self.task_config['model']].from_pretrained(checkpoint, config=config_obj, mirror='tuna')
+                model = CUSTOM_MODEL_CLASS_DICT[self.task_config['model']].from_pretrained(checkpoint, config=config_obj, mirror='tuna',
+                                                                                                  ignore_mismatched_sizes=True)
                 model.tokenizer = self.my_tokenizer
             else:
                 config_obj = CUSTOM_MODEL_CONFIG_CLASS_DICT[self.task_config['model']](vocab_size=len(self.my_tokenizer),

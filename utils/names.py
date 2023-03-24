@@ -29,7 +29,10 @@ DISTILBERT = 'distilbert'
 CNN = 'cnn'
 LSTM = 'lstm'
 RNN = 'rnn'
-
+ROBERTA = 'roberta'
+ALBERT = 'albert'
+XLNET = 'xlnet'
+ELECTRA = 'electra'
 
 # parameter_names
 TFIDFS = 'tfidfs'

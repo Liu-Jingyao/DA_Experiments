@@ -11,3 +11,4 @@ nltk
 gevent
 peewee
 pymysql
+transformers[sentencepiece]

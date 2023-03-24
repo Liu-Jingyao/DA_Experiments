@@ -1,7 +1,9 @@
 import os
 import sys
 
-from transformers import PreTrainedModel, PretrainedConfig, DistilBertConfig
+from transformers import PreTrainedModel, PretrainedConfig, DistilBertConfig, XLMRobertaForSequenceClassification, \
+    XLMRobertaConfig, RobertaConfig, RobertaForSequenceClassification, AlbertConfig, AlbertForSequenceClassification, \
+    XLNetForSequenceClassification, XLNetConfig, ElectraConfig, T5Config, ElectraForSequenceClassification
 from typing import Dict
 
 from data_augmentations.tfidf_word_dropout import TFIDFPreProcess
@@ -31,11 +33,19 @@ PROXY_DICT = {names.VPN: 'http://127.0.0.1:7890',
 CUSTOM_MODEL_CONFIG_CLASS_DICT: Dict[str, type(PretrainedConfig)] = {names.CNN: CNNConfig,
                                                                      names.LSTM: LSTMConfig,
                                                                      names.RNN: RNNConfig,
-                                                                     names.DISTILBERT: DistilBERTConfig}
+                                                                     names.DISTILBERT: DistilBERTConfig,
+                                                                     names.ROBERTA: RobertaConfig,
+                                                                     names.ALBERT: AlbertConfig,
+                                                                     names.XLNET: XLNetConfig,
+                                                                     names.ELECTRA: ElectraConfig}
 CUSTOM_MODEL_CLASS_DICT: Dict[str, type(PreTrainedModel)] = {names.CNN: CNN,
                                                              names.DISTILBERT: DistilBERTForSequenceClassification,
                                                              names.LSTM: LSTM,
-                                                             names.RNN: RNN}
+                                                             names.RNN: RNN,
+                                                             names.ROBERTA: RobertaForSequenceClassification,
+                                                             names.ALBERT: AlbertForSequenceClassification,
+                                                             names.XLNET: XLNetForSequenceClassification,
+                                                             names.ELECTRA: ElectraForSequenceClassification}
 CUSTOM_MODEL_PREPROCESS_DICT: Dict[str, callable] = {names.TFIDFS: TF_IDFExtractor.batch_analyze,
                                                      names.DROPOUT_PROB: TFIDFPreProcess.batch_preprocess}
 
