@@ -127,6 +127,7 @@ class ProjectConfig:
             self.current_logger.addHandler(stdout_handler)
             self.new_dataset = self.current_task_config['dataset'] != self.prev_dataset
             self.new_aug = self.current_task_config['augmentations'] and self.current_task_config['augmentations'][0] != self.prev_aug
+            self.new_aug = self.new_aug or self.new_dataset
 
             self.current_task_id = self.current_task_id + 1
             self.prev_dataset = self.current_task_config['dataset']

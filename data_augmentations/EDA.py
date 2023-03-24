@@ -211,7 +211,7 @@ def batch_synonym_replacement(batch, text_field):
 #     return batch
 
 def batch_random_deletion(batch, text_field):
-    res = [eda(text, p_rd=0.005) for text in batch[text_field]]
+    res = [eda(text, p_rd=0.1) for text in batch[text_field]]
     batch[text_field] = [_[0] for _ in res]
     batch['original_text'] = [_[-1] for _ in res]
     return batch

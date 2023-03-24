@@ -25,15 +25,19 @@ default:
 training_config:
   distilbert:
       imdb:
-          epochs: 3
+          epochs: 2
+      sst-2:
+          epochs: 4
       rotten_tomatoes:
-          epochs: 3
+          epochs: 32
       amazon-5:
           epochs: 1
       yelp-5:
           epochs: 1
   cnn:
       imdb:
+          epochs: 10
+      sst-2:
           epochs: 20
       rotten_tomatoes:
           epochs: 20
@@ -43,6 +47,8 @@ training_config:
           epochs: 1
   lstm:
       imdb:
+          epochs: 10
+      sst-2:
           epochs: 20
       rotten_tomatoes:
           epochs: 20
@@ -52,16 +58,20 @@ training_config:
           epochs: 1
 workflow_config:
   baseline:
-    models: [ distilbert, cnn, lstm ]
-    datasets: [ imdb, rotten_tomatoes, amazon-5, yelp-5 ]
-  random_word_dropout:
-    models: [ distilbert, cnn, lstm ]
-    datasets: [ imdb, rotten_tomatoes, amazon-5, yelp-5 ]
-    prob: 0.005
-#  tfidf_word_dropout:
+    models: [ distilbert ]
+    datasets: [ rotten_tomatoes ]
+  random_deletion:
+    models: [ distilbert ]
+    datasets: [ rotten_tomatoes ]
+    prob: 0.1
+#  random_word_dropout:
 #    models: [ distilbert, cnn, lstm ]
-#    datasets: [ imdb, rotten_tomatoes, amazon-5, yelp-5 ]
-#    prob: 0.005
+#    datasets: [ imdb ]
+#    prob: 0.1
+  tfidf_word_dropout:
+    models: [ distilbert ]
+    datasets: [ rotten_tomatoes ]
+    prob: 0.1
 #  synonym_replacement:
 #    models: [ distilbert, cnn, lstm ]
 #    datasets: [ imdb, rotten_tomatoes, amazon-5, yelp-5 ]

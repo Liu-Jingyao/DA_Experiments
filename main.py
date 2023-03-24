@@ -33,41 +33,26 @@ if __name__ == '__main__':
                                             streaming=big_dataset, cache_dir=CACHE_DIR)
             dataset_helper = DatasetHelper(dataset_config['dataset'] + dataset_config.get('subset', ''), dataset,
                                            dataset_config, big_dataset, task_config['map_batch_size'])
-            dataset_helper.split()
-            dataset_helper.field_regular()
+
+        if is_new_aug:
+            # restore augmented dataset
+            dataset_helper.restore()
 
         # text augmentation
-        dataset_helper.text_augmentation(text_augmentations, my_logger)
+        if text_augmentations:
+            task_config['epochs'] = task_config['epochs'] // 2
+            if is_new_aug:
+                dataset_helper.text_augmentation(text_augmentations, my_logger)
 
         # tokenize
         data_collator = transformers.DataCollatorWithPadding(tokenizer=my_tokenizer)
-
-        dataset_helper.tokenize(my_tokenizer)
+        if is_new_dataset or is_new_aug:
+            dataset_helper.tokenize(my_tokenizer)
 
         # feature_space augmentation
-        dataset_helper.feature_augmentation(feature_augmentations, my_logger, my_tokenizer)
-
-
-        # load model
-        if model_config['pretrained']:
-            checkpoint = model_config['checkpoint']
-            config_obj = CUSTOM_MODEL_CONFIG_CLASS_DICT[task_config['model']].from_pretrained(checkpoint,
-                                                                                              vocab_size=len(my_tokenizer),
-                                                                                              num_labels=dataset_config['class_num'],
-                                                                                              aug_ops=dataset_helper.current_feature_augmentation_flags,
-                                                                                              seq_len=my_tokenizer.max_length)
-            model = CUSTOM_MODEL_CLASS_DICT[task_config['model']].from_pretrained(checkpoint, config=config_obj,
-                                                                                  mirror='tuna')
-            model.tokenizer = my_tokenizer
-        else:
-            config_obj = CUSTOM_MODEL_CONFIG_CLASS_DICT[task_config['model']](vocab_size=len(my_tokenizer),
-                                                                              num_labels=dataset_config['class_num'],
-                                                                              aug_ops=dataset_helper.current_feature_augmentation_flags)
-            model = CUSTOM_MODEL_CLASS_DICT[task_config['model']](config_obj, my_tokenizer)
+        if is_new_aug and feature_augmentations:
+            dataset_helper.feature_augmentation(feature_augmentations, my_logger, my_tokenizer)
 
         # train-test
-        training_helper = TrainingHelper(task_config, dataset_helper, data_collator, model, my_logger)
+        training_helper = TrainingHelper(task_config, dataset_helper, data_collator, model_config, dataset_config, my_tokenizer, my_logger)
         training_helper.train_test_loop()
-
-        # restore augmented dataset
-        dataset_helper.restore()

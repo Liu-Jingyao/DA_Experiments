@@ -1,3 +1,11 @@
+sst-2:
+  dataset: 'glue'
+  subset: 'sst2'
+  loading_way: 'huggingface'
+  text_field: 'sentence'
+  label_field: 'label'
+  splits: {'train': 67349, 'validation': 872}
+  class_num: 2
 imdb:
   dataset: 'imdb'
   loading_way: 'huggingface'

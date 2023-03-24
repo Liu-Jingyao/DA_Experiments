@@ -1,3 +1,5 @@
+import copy
+
 import datasets
 
 from data_augmentations.tfidf_word_dropout import TFIDFPreProcess
@@ -11,14 +13,18 @@ class DatasetHelper:
         self.dataset_dict = dataset
         self.train_dataset = dataset['train']
         self.eval_dataset = dataset['validation'] if 'validation' in dataset.keys() else None
-        self.test_dataset = dataset['test']
+        self.test_dataset = dataset['test'] if 'test' in dataset.keys() else None
         self.dataset_config = dataset_config
         self.big_dataset = big_dataset
         self.map_batch_size = map_batch_size
         self.current_text_augmentation_flag = None
-        self.current_feature_augmentation_flag = None
-        self.current_feature_augmentation_flags = None
+        self.current_feature_augmentation_flags = {aug_name: None for aug_name in names.FEATURE_DATA_AUGMENTATIONS}
         self.train_size = dataset_config['splits']['train'] if big_dataset else dataset['train'].num_rows
+
+        self.split()
+        self.field_regular()
+
+        self.original_train_dataset = copy.deepcopy(self.train_dataset)
 
 
     def split(self):
@@ -41,6 +47,8 @@ class DatasetHelper:
                 self.dataset_dict['train'] = self.train_dataset = train_dataset
                 self.dataset_dict['validation'] = self.eval_dataset = validation_dataset
             self.train_size = self.train_size - eval_size
+        if 'test' not in self.dataset_config['splits'].keys():
+            self.test_dataset = self.dataset_dict['test'] = copy.deepcopy(self.eval_dataset)
 
     def field_regular(self):
         # concat text title with content
@@ -74,56 +82,38 @@ class DatasetHelper:
         my_tokenizer.max_length = max_sequence_length
 
     def text_augmentation(self, text_augmentations, my_logger):
-        self.current_text_augmentation_flag = text_augmentations[0]['name'] if text_augmentations else None
-        if not self.current_text_augmentation_flag:
-            return
+        self.current_text_augmentation_flag = text_augmentations[0]['name']
+        augmentation_config = text_augmentations[0]
+        my_logger.info(f"processing {augmentation_config['name']}")
+        data_augmentation = TEXT_DATA_AUGMENTATION_DICT[augmentation_config['name']]
+        aug_dataset = self.original_train_dataset.map(lambda batch: data_augmentation(batch, self.dataset_config['text_field']),
+                                                             batched=True, batch_size=self.map_batch_size,
+                                                             load_from_cache_file=False)
+        my_logger.info(f"{self.current_text_augmentation_flag} down.\n"
+                       f"example: original_text='{aug_dataset[0]['original_text']}',"
+                       f" aug_text='{aug_dataset[0][self.dataset_config['text_field']]}'")
+        self.dataset_dict['train'] = self.train_dataset = datasets.concatenate_datasets([self.original_train_dataset, aug_dataset])
+        self.train_size = self.train_size * 2
 
-        if self.current_text_augmentation_flag in self.train_dataset.column_names:
-            self.dataset_dict['train'] = self.train_dataset = self.train_dataset.rename_columns({self.dataset_config['text_field']: 'original_text'})
-            self.dataset_dict['train'] = self.train_dataset = self.train_dataset.rename_columns({self.current_text_augmentation_flag: self.dataset_config['text_field']})
-            my_logger.info(f"{self.current_text_augmentation_flag} down (skip)")
-        else:
-            dataset_list = []
-            for augmentation_config in text_augmentations:
-                my_logger.info(f"processing {augmentation_config['name']}")
-                data_augmentation = TEXT_DATA_AUGMENTATION_DICT[augmentation_config['name']]
-                aug_dataset = self.train_dataset.map(lambda batch: data_augmentation(batch, self.dataset_config['text_field']),
-                                                   batched=True, batch_size=self.map_batch_size,
-                                                   load_from_cache_file=False)
-                dataset_list.append(aug_dataset)
-            # need to change to fit multiple text augmentation but not now
-            self.dataset_dict['train'] = self.train_dataset = dataset_list[0]
-            my_logger.info(f"{self.current_text_augmentation_flag} down.\n"
-                           f"example: original_text='{self.train_dataset[0]['original_text']}',"
-                           f" aug_text='{self.train_dataset[0][self.dataset_config['text_field']]}'")
 
     def feature_augmentation(self, feature_augmentations, my_logger, my_tokenizer):
-        self.current_feature_augmentation_flags = {aug_name: None for aug_name in names.FEATURE_DATA_AUGMENTATIONS}
-        if not feature_augmentations:
-            self.current_feature_augmentation_flag = None
-            return
-
-        for feature_augmentation in feature_augmentations:
-            self.current_feature_augmentation_flags[feature_augmentation['name']] = feature_augmentation['prob']
-            if self.current_feature_augmentation_flag == feature_augmentation['name']:
-                my_logger.info(f"{self.current_feature_augmentation_flag} down. (skip)")
-            else:
-                self.current_feature_augmentation_flag = feature_augmentation['name']
-
-                if 'exinfo' in feature_augmentation.keys():
-                    exinfo = feature_augmentation['exinfo']
-                    preprocess = CUSTOM_MODEL_PREPROCESS_DICT[exinfo]
-                    parameters_may_need = {
-                        'token_field': 'input_ids',
-                        'tfidf_preprocess': TFIDFPreProcess(self.train_dataset, vocab_size=len(my_tokenizer),
-                                                            p=feature_augmentation['prob'])
-                        if exinfo == names.DROPOUT_PROB else None
-                    }
-                    self.dataset_dict['train'] = self.train_dataset = self.train_dataset.map(lambda batch: preprocess(batch, **parameters_may_need), batched=True,
-                                                      batch_size=self.map_batch_size,
-                                                      load_from_cache_file=False)
-                    my_tokenizer.model_input_names += [exinfo]
-                my_logger.info(f"{self.current_feature_augmentation_flag} down.")
+        feature_augmentation = feature_augmentations[0]
+        self.current_feature_augmentation_flags = {aug_name: feature_augmentation['prob'] if aug_name ==feature_augmentation['name'] else None
+                                                   for aug_name in names.FEATURE_DATA_AUGMENTATIONS}
+        if 'exinfo' in feature_augmentation.keys():
+            exinfo = feature_augmentation['exinfo']
+            preprocess = CUSTOM_MODEL_PREPROCESS_DICT[exinfo]
+            parameters_may_need = {
+                'token_field': 'input_ids',
+                'tfidf_preprocess': TFIDFPreProcess(self.train_dataset, vocab_size=len(my_tokenizer),
+                                                    p=feature_augmentation['prob'])
+                if exinfo == names.DROPOUT_PROB else None
+            }
+            self.dataset_dict['train'] = self.train_dataset = self.train_dataset.map(lambda batch: preprocess(batch, **parameters_may_need), batched=True,
+                                              batch_size=self.map_batch_size,
+                                              load_from_cache_file=False)
+            my_tokenizer.model_input_names += [exinfo]
+            my_logger.info(f"{feature_augmentation['name']} down.")
         my_logger.info(self.current_feature_augmentation_flags)
 
     def post_split(self):
@@ -139,6 +129,6 @@ class DatasetHelper:
 
     def restore(self):
         if self.current_text_augmentation_flag:
-            self.dataset_dict['train'] = self.train_dataset = self.train_dataset.rename_columns({self.dataset_config['text_field']: self.current_text_augmentation_flag})
-            self.dataset_dict['train'] = self.train_dataset = self.train_dataset.rename_columns({'original_text': self.dataset_config['text_field']})
+            self.dataset_dict['train'] = self.train_dataset = self.original_train_dataset
             self.current_text_augmentation_flag = None
+            self.train_size = self.train_size // 2

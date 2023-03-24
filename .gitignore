@@ -3,3 +3,5 @@
 /logs/*
 /datasets/
 /datasets/
+/utils/mysql_config.py
+testcode.py

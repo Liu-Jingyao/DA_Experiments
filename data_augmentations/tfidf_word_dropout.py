@@ -22,6 +22,8 @@ class TFIDFPreProcess:
     @staticmethod
     def batch_preprocess(batch, tfidf_preprocess, **kwargs):
         dropout_prob = []
+        while len(tqdm._instances) > 0:
+            tqdm._instances.pop().close()
         for text in tqdm(batch['input_ids'], desc="Calculating dataset dropout prob"):
             dropout_prob += [tfidf_preprocess.get_text_dropout_prob(text)]
         batch['dropout_prob'] = dropout_prob
@@ -55,29 +57,6 @@ class TFIDFPreProcess:
             "tf_idf": tf_idf,
         }
 
-    def get_batch_prob_tensor(self, batch):
-        dropout_prob = torch.empty_like(batch, dtype=torch.float, device=self.device)
-        for i in range(len(batch)):
-            dropout_prob[i] = self.get_text_dropout_prob(batch[i])
-        return dropout_prob
-
-    def get_batch_prob(self, texts):
-        dropout_prob = []
-        for text in tqdm(texts, desc="Calculating dataset dropout prob"):
-            dropout_prob += [self.get_text_dropout_prob(text)]
-        return dropout_prob
-
-    def get_text_dropout_prob_tensor(self, text):
-        """Compute the probability of replacing tokens in a sentence."""
-        cur_tf_idf = torch.zeros(self.vocab_size, device=self.device)
-        for word in text:
-            cur_tf_idf[word] += 1. / len(text) * self.idf[word]
-        dropout_prob = torch.empty_like(text, dtype=torch.float, device=self.device)
-        for i in range(len(text)):
-            dropout_prob[i] = cur_tf_idf[text[i]]
-        dropout_prob = torch.max(dropout_prob) - dropout_prob
-        dropout_prob = dropout_prob * self.p * len(text) / dropout_prob.sum()
-        return dropout_prob
 
     def get_text_dropout_prob(self, text):
         """Compute the probability of replacing tokens in a sentence."""
@@ -90,4 +69,6 @@ class TFIDFPreProcess:
         replace_prob = np.array(replace_prob)
         replace_prob = np.max(replace_prob) - replace_prob
         replace_prob = replace_prob * self.p * len(text) / replace_prob.sum()
+        np.clip(replace_prob, 0, 1, out=replace_prob)
+
         return replace_prob.tolist()

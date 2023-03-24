@@ -333,6 +333,7 @@ class DistilBERT(DistilBertModel, ABC):
 
         self.keyword_enhance_flag = config.aug_ops[names.KEYWORD_ENHANCE]
         self.tfidf_word_dropout_flag = config.aug_ops[names.TFIDF_WORD_DROPOUT]
+        self.random_word_dropout_flag = config.aug_ops[names.RANDOM_WORD_DROPOUT]
 
         self.embeddings = KeywordEnhancedEmbeddings(config)
         self.transformer = KeywordEnhancedTransformer(config)
@@ -354,7 +355,12 @@ class DistilBERT(DistilBertModel, ABC):
                                                                       mirror='tuna', ).cuda()
         if self.keyword_enhance_flag:
             keyword_hidden_state = self.keyword_bert_model(input_ids=keyword_ids[:, :1]).last_hidden_state
+        if self.training and self.random_word_dropout_flag:
+            keep = torch.empty_like(input_ids).bernoulli(1 - self.random_word_dropout_flag).bool()
+            input_ids = torch.where(keep, input_ids, torch.empty_like(input_ids).fill_(0))
         if self.training and self.tfidf_word_dropout_flag:
+            if (dropout_prob < 0).any() or (dropout_prob > 1).any():
+                print(dropout_prob.tolist())
             keep = torch.bernoulli(1 - dropout_prob).bool()
             input_ids = torch.where(keep, input_ids, torch.empty_like(input_ids).fill_(0))
 
