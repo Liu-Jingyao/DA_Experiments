@@ -2,23 +2,18 @@ import torch
 import transformers
 
 if __name__ == '__main__':
-    import torch
+    from queue import PriorityQueue as PQ
 
-    a = torch.Tensor([[1, 2, 3, 4, 5, 6, 7, 8, 0, 0, 2], [1, 2, 3, 4, 5, 6, 7, 8, 0, 0, 2]])
-    keep = torch.Tensor([[1, 0, 1, 1, 0, 1, 1, 1, 1, 1, 1], [0, 1, 0, 1, 1, 1, 0, 1, 1, 1, 1]])
+    pq = PQ()
+    pq.put((1, 'a'))
+    pq.put((2, 'c'))
+    pq.put((2, 'b'))
+    pq.put((2, 'b'))
+    print(pq.queue)  # [(1, 'a'), (2, 'b'), (2, 'b'), (2, 'c')]
+    item0 = pq.get()  # (1, 'a')
+    print(pq.queue)  # [(2, 'b'), (2, 'b'), (2, 'c')]
 
-    # create boolean mask
-    keep[:,-1] = 0
-    mask = (keep != 0)
-    max_len = len(keep[0])
+    print(pq.qsize())  # 优先队列的尺寸
 
-    # select non-zero elements from a
-    a_list = []
-    for i in range(a.size(0)):
-        new_a_i = a[i][mask[i]]
-        new_a_i = torch.nn.functional.pad(new_a_i, (0, max_len - len(new_a_i) - 1), mode='constant', value=0)
-        new_a_i = torch.cat((new_a_i, a[i,-1].unsqueeze(0)))
-        a_list.append(new_a_i)
-    a = torch.stack(a_list)
-
-    print(a)
+    while not pq.empty():
+        print(pq.get())

@@ -6,7 +6,7 @@ map_batch_size: 1000
 eval_steps: 200 # 1000/200
 logging_steps: 100 # 100/100
 ignore_cache: true
-repeat_num: 5
+repeat_num: 3
 
 ---
 # single test config
@@ -92,10 +92,14 @@ training_config:
         batch_size: 16
 workflow_config:
   synonym_replacement:
-    models: [ distilbert ]
+    models: [ distilbert, roberta, albert ]
     datasets: [ rotten_tomatoes ]
-    prob: 0.05
-  online_random_replacement:
-    models: [ distilbert ]
+    prob: 0.1
+#  online_random_replacement:
+#    models: [ distilbert, roberta, albert ]
+#    datasets: [ rotten_tomatoes ]
+#    prob: 0.05
+  pred_loss_replacement:
+    models: [ distilbert, roberta, albert ]
     datasets: [ rotten_tomatoes ]
-    prob: 0.05
+    prob: 0.1
