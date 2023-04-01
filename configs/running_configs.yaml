@@ -6,7 +6,7 @@ map_batch_size: 1000
 eval_steps: 200 # 1000/200
 logging_steps: 100 # 100/100
 ignore_cache: true
-repeat_num: 3
+repeat_num: 5
 
 ---
 # single test config
@@ -24,82 +24,78 @@ default:
 # workflow test config
 training_config:
   distilbert:
-      imdb:
-          epochs: 2
-      sst-2:
-          epochs: 4
-      rotten_tomatoes:
-          epochs: 4
-      amazon-5:
-          epochs: 1
-      yelp-5:
-          epochs: 1
-  cnn:
-      imdb:
-          epochs: 10
-      sst-2:
-          epochs: 20
-      rotten_tomatoes:
-          epochs: 20
-      amazon-5:
-          epochs: 1
-      yelp-5:
-          epochs: 1
-  lstm:
-      imdb:
-          epochs: 10
-      sst-2:
-          epochs: 20
-      rotten_tomatoes:
-          epochs: 20
-      amazon-5:
-          epochs: 1
-      yelp-5:
-          epochs: 1
+    imdb:
+        epochs: 2
+    sst-2:
+        epochs: 2
+    rotten_tomatoes:
+        epochs: 2
+    amazon-5:
+        epochs: 2
+    yelp-5:
+        epochs: 2
   roberta:
+    imdb:
+        epochs: 2
+        batch_size: 16
+    sst-2:
+        epochs: 2
     rotten_tomatoes:
-      epochs: 2
+        epochs: 2
+    amazon-5:
+        epochs: 2
+        batch_size: 16
+    yelp-5:
+        epochs: 2
+        batch_size: 16
   albert:
+    imdb:
+        epochs: 2
+        batch_size: 16
+    sst-2:
+        epochs: 2
     rotten_tomatoes:
-      epochs: 2
+        epochs: 2
+    amazon-5:
+        epochs: 2
+        batch_size: 16
+    yelp-5:
+        epochs: 2
+        batch_size: 16
   xlnet:
+    imdb:
+        epochs: 2
+        batch_size: 16
+    sst-2:
+        epochs: 2
     rotten_tomatoes:
-      epochs: 2
-  t5:
-    rotten_tomatoes:
-      epochs: 2
+        epochs: 2
+    amazon-5:
+        epochs: 2
+        batch_size: 16
+    yelp-5:
+        epochs: 2
+        batch_size: 16
   electra:
+    imdb:
+        epochs: 2
+        batch_size: 16
+    sst-2:
+        epochs: 2
     rotten_tomatoes:
-      epochs: 2
+        epochs: 2
+    amazon-5:
+        epochs: 2
+        batch_size: 16
+    yelp-5:
+        epochs: 2
+        batch_size: 16
 workflow_config:
-  baseline:
-    models: [ xlnet ]
+  synonym_replacement:
+    models: [ distilbert ]
     datasets: [ rotten_tomatoes ]
-#  random_deletion:
-#    models: [ distilbert ]
-#    datasets: [ rotten_tomatoes ]
-#    prob: 0.1
-#  random_word_dropout:
-#    models: [ distilbert, cnn, lstm ]
-#    datasets: [ imdb ]
-#    prob: 0.1
-#  tfidf_word_dropout:
-#    models: [ distilbert ]
-#    datasets: [ rotten_tomatoes ]
-#    prob: 0.1
-#  synonym_replacement:
-#    models: [ distilbert, cnn, lstm ]
-#    datasets: [ imdb, rotten_tomatoes, amazon-5, yelp-5 ]
-#    prob: 0.25
-#  online_random_replacement:
-#    models: [ distilbert, lstm ]
-#    datasets: [ imdb, rotten_tomatoes, amazon-5 ]
-#    prob: 0.25
-#  loss_based_replacement:
-#    models: [ distilbert, lstm ]
-#    datasets: [ imdb, rotten_tomatoes, amazon-5 ]
-#    prob: 0.25
-#  pred_loss_replacement:
-#    models: [ distilbert, lstm ]
-#    datasets: [ imdb, rotten_tomatoes, amazon-5 ]
-#    prob: 0.25
+    prob: 0.05
+  online_random_replacement:
+    models: [ distilbert ]
+    datasets: [ rotten_tomatoes ]
+    prob: 0.05

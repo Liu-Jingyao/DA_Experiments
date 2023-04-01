@@ -3,6 +3,7 @@ import os
 import random
 from statistics import mean
 
+import datasets
 import evaluate
 import numpy
 import numpy as np
@@ -13,6 +14,7 @@ from time import strftime, gmtime
 from transformers import set_seed
 
 from utils.DBHelper import save_result
+from utils.ProjectConfig import retry
 from utils.consts import CUSTOM_MODEL_CONFIG_CLASS_DICT, CUSTOM_MODEL_CLASS_DICT
 
 
@@ -41,7 +43,7 @@ class TrainingHelper:
 
     def train_test_loop(self):
         repeat_test_num = self.task_config['repeat_num']
-        seeds = [93, 79, 17]
+        seeds = [1, 10, 100, 1000, 10000]
         for i in range(repeat_test_num):
             start_time = time.time()
             seed = seeds[i]
@@ -52,18 +54,17 @@ class TrainingHelper:
             # reload model
             if self.model_config['pretrained']:
                 checkpoint = self.model_config['checkpoint']
-                config_obj = CUSTOM_MODEL_CONFIG_CLASS_DICT[self.task_config['model']].from_pretrained(checkpoint,
-                                                                                                  vocab_size=len(self.my_tokenizer),
-                                                                                                  num_labels=self.dataset_config['class_num'],
-                                                                                                  aug_ops=self.dataset_helper.current_feature_augmentation_flags,
-                                                                                                  seq_len=self.my_tokenizer.max_length)
-                model = CUSTOM_MODEL_CLASS_DICT[self.task_config['model']].from_pretrained(checkpoint, config=config_obj, mirror='tuna',
+                config_obj = retry(CUSTOM_MODEL_CONFIG_CLASS_DICT[self.task_config['model']].from_pretrained, checkpoint,
+                                                                                                       vocab_size=len(self.my_tokenizer),
+                                                                                                       num_labels=self.dataset_config['class_num'],
+                                                                                                       aug_ops=self.dataset_helper.current_online_augmentation_flag)
+                model = retry(CUSTOM_MODEL_CLASS_DICT[self.task_config['model']].from_pretrained, checkpoint, config=config_obj, mirror='tuna',
                                                                                                   ignore_mismatched_sizes=True)
                 model.tokenizer = self.my_tokenizer
             else:
                 config_obj = CUSTOM_MODEL_CONFIG_CLASS_DICT[self.task_config['model']](vocab_size=len(self.my_tokenizer),
-                                                                                  num_labels=self.dataset_config['class_num'],
-                                                                                  aug_ops=self.dataset_helper.current_feature_augmentation_flags)
+                                                                                       num_labels=self.dataset_config['class_num'],
+                                                                                       aug_ops=self.dataset_helper.current_online_augmentation_flag)
                 model = CUSTOM_MODEL_CLASS_DICT[self.task_config['model']](config_obj, self.my_tokenizer)
 
 
@@ -71,9 +72,9 @@ class TrainingHelper:
 
             # shuffle dataset
             if self.big_dataset:
-                train_dataset = train_dataset.shuffle(buffer_size=self.task_config['map_batch_size'])
+                train_dataset = train_dataset.shuffle(buffer_size=self.task_config['map_batch_size'], seed=seed)
             else:
-                train_dataset = train_dataset.shuffle(load_from_cache_file=False)
+                train_dataset = train_dataset.shuffle(load_from_cache_file=False, seed=seed)
 
             if self.big_dataset:
                 training_params = {'max_steps': self.train_size * self.task_config['epochs'] // self.task_config['batch_size']}
@@ -90,7 +91,7 @@ class TrainingHelper:
                                                              save_strategy=IntervalStrategy.NO)
 
             trainer = transformers.Trainer(model, train_args, train_dataset=train_dataset,
-                                           eval_dataset=validation_dataset,
+                                           # eval_dataset=validation_dataset,
                                            data_collator=self.data_collator, compute_metrics=compute_metrics)
             trainer.train()
 

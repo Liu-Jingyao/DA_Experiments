@@ -1,53 +1,53 @@
 - name: 'keyword_enhance'
-  space: 'feature'
+  space: 'online'
   quality: 'high'
   exinfo: 'tfidfs'
 
 - name: 'random_word_dropout'
-  space: 'feature'
+  space: 'online'
   quality: 'low'
 
 - name: 'tfidf_word_dropout'
-  space: 'feature'
+  space: 'online'
   quality: 'low'
   exinfo: 'dropout_prob'
 
 - name: 'hidden_state_pooling'
-  space: 'feature'
+  space: 'online'
   quality: 'high'
 
 - name: 'hidden_state_cnn'
-  space: 'feature'
+  space: 'online'
   quality: 'high'
 
 - name: 'synonym_replacement'
-  space: 'text'
+  space: 'offline'
   quality: 'high'
 
 - name: 'random_deletion'
-  space: 'text'
+  space: 'offline'
   quality: 'low'
 
 - name: 'random_swap'
-  space: 'text'
+  space: 'offline'
   quality: 'low'
 
 - name: 'random_insertion'
-  space: 'text'
+  space: 'offline'
   quality: 'high'
 
 - name: 'loss_based_replacement'
-  space: 'feature'
+  space: 'online'
   quality: 'high'
 
 - name: 'pred_based_replacement'
-  space: 'feature'
+  space: 'online'
   quality: 'high'
 
 - name: 'pred_loss_replacement'
-  space: 'feature'
+  space: 'online'
   quality: 'high'
 
 - name: 'online_random_replacement'
-  space: 'feature'
+  space: 'online'
   quality: 'high'

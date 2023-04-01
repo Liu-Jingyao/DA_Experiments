@@ -1,25 +1,18 @@
 #!/usr/bin/env Python
 # coding=utf-8
 import copy
-import logging
-import threading
 from abc import ABC
 
 import numpy
 import os
-from tqdm import tqdm
 
-from multiprocessing import Pool
 import utils.names as names
 import torch.nn
-from transformers import PreTrainedModel, PretrainedConfig, DistilBertTokenizerFast
+from transformers import PreTrainedModel
 from transformers.utils import ModelOutput
 
 from data_augmentations.EDA import synonym_replacement
-from data_augmentations.loss_based_replacement import loss_based_replacement
-from data_augmentations.pred_based_replacement import pred_based_replacement
-from data_augmentations.pred_loss_replacement import pred_loss_replacement
-from models.Base import BaseConfig
+from models.simple_models.Base import BaseConfig
 
 
 class LSTMConfig(BaseConfig):

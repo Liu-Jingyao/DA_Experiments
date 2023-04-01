@@ -1,13 +1,11 @@
 from abc import ABC
 
-from torch.autograd import Variable
-
 import utils.names as names
 import torch.nn
-from transformers import PreTrainedModel, PretrainedConfig
+from transformers import PreTrainedModel
 from transformers.utils import ModelOutput
 
-from models.Base import BaseConfig
+from models.simple_models.Base import BaseConfig
 
 
 class RNNConfig(BaseConfig):

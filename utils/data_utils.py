@@ -1,18 +1,33 @@
 import os
 import re
 from abc import ABC
-from typing import Union, Dict, Optional
 
 import torch
 from gensim import corpora
 from gensim import  models
 import itertools
 
+import copy
+import json
+import os
+import re
+import warnings
+from collections import OrderedDict, UserDict
+from collections.abc import Mapping, Sized
+from contextlib import contextmanager
+from dataclasses import dataclass, field
+from typing import TYPE_CHECKING, Any, Dict, List, NamedTuple, Optional, Sequence, Tuple, Union
+
+import numpy as np
+from packaging import version
+
+from torch import TensorType
 from transformers import PreTrainedTokenizerBase, BatchEncoding
 from transformers.tokenization_utils_base import EncodedInput
-from transformers.utils import PaddingStrategy
+from transformers.utils import PaddingStrategy, is_tf_tensor, is_torch_tensor, to_py_obj
 
 from utils.names import EX_FEATURE_NAMES
+
 
 def get_custom_tokenizer(tokenizer: PreTrainedTokenizerBase):
     class CustomTokenizer(tokenizer.__class__, ABC):
@@ -44,8 +59,9 @@ def get_custom_tokenizer(tokenizer: PreTrainedTokenizerBase):
                     if return_attention_mask:
                         encoded_inputs["attention_mask"] = encoded_inputs["attention_mask"] + [0] * difference
                     if "token_type_ids" in encoded_inputs:
+                        token_type_ids_difference = max_length - len(encoded_inputs["token_type_ids"])
                         encoded_inputs["token_type_ids"] = (
-                            encoded_inputs["token_type_ids"] + [self.pad_token_type_id] * difference
+                            encoded_inputs["token_type_ids"] + [self.pad_token_type_id] * token_type_ids_difference
                         )
                     if "special_tokens_mask" in encoded_inputs:
                         encoded_inputs["special_tokens_mask"] = encoded_inputs["special_tokens_mask"] + [1] * difference
@@ -58,7 +74,8 @@ def get_custom_tokenizer(tokenizer: PreTrainedTokenizerBase):
                     if return_attention_mask:
                         encoded_inputs["attention_mask"] = [0] * difference + encoded_inputs["attention_mask"]
                     if "token_type_ids" in encoded_inputs:
-                        encoded_inputs["token_type_ids"] = [self.pad_token_type_id] * difference + encoded_inputs[
+                        token_type_ids_difference = max_length - len(encoded_inputs["token_type_ids"])
+                        encoded_inputs["token_type_ids"] = [self.pad_token_type_id] * token_type_ids_difference + encoded_inputs[
                             "token_type_ids"
                         ]
                     if "special_tokens_mask" in encoded_inputs:
@@ -106,34 +123,6 @@ class TF_IDFExtractor:
         keyword_list = TF_IDFExtractor.get_keyword_list(batch[token_field], tfidf_list)
         batch['keyword_ids'] = keyword_list
         return batch
-
-class RandomDropout(torch.nn.Module):
-    def __init__(self, p: float = 0.5, device='cuda:0'):
-        super(RandomDropout, self).__init__()
-        self.device = device
-        self.p = p
-        if self.p < 0 or self.p > 1:
-            raise ValueError("p must be a probability")
-
-    def forward(self, x):
-        if self.training:
-            for i in range(x.size()[0]):
-                x[i] = x[i].mul(torch.empty(x.size()[1], device=self.device).uniform_(0, 1) >= self.p) # * (1 / (1 - self.p))
-        return x
-
-class KeywordDropout(torch.nn.Module):
-    def __init__(self, p: float = 0.5, device = 'cuda:0'):
-        super(KeywordDropout, self).__init__()
-        self.device = device
-        self.p = p
-        if self.p < 0 or self.p > 1:
-            raise ValueError("p must be a probability")
-
-    def forward(self, x, tfidfs):
-        if self.training:
-            for i in range(x.size()[0]):
-                x[i] = x[i].mul(1-tfidfs[i].uniform_(0, 1) >= self.p) # * (1 / (1 - self.p))
-        return x
 
 def singleton(class_):
     instances = {}

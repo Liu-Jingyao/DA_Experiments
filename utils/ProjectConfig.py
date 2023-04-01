@@ -34,11 +34,15 @@ class ProjectConfig:
                     for model in workflow_config['baseline']['models']:
                         task_config = self.running_config_list[0].copy()
                         task_epoch_num = self.running_config_list[2]['training_config'][model][dataset]['epochs']
+                        if 'batch_size' in self.running_config_list[2]['training_config'][model][dataset].keys():
+                            task_batch_size = self.running_config_list[2]['training_config'][model][dataset]['batch_size']
+                        else:
+                            task_batch_size = task_config['batch_size']
                         task_name = f"{model}_{dataset}_{task_epoch_num}epochs_baseline"
                         task_config.update({'dataset': dataset, 'model': model,
                                             'epochs': training_config[model][dataset]['epochs'],
                                             'task_name': task_name,
-                                            'baseline': True,
+                                            'baseline': True, 'batch_size': task_batch_size,
                                             'augmentations': [], 'aug_params': []})
                         self.task_list.append(task_config)
                 workflow_config.pop('baseline')
@@ -58,15 +62,20 @@ class ProjectConfig:
             for dataset, dataset_dict in new_workflow_config.items():
                 for k in dataset_dict.keys():
                   new_workflow_config[dataset][k] = list(dict.fromkeys(dataset_dict[k]))
-
+            # todo 默认为所有的组合，没考虑组合不全的情况
             for dataset, dataset_dict in new_workflow_config.items():
                 for aug, aug_prob in dataset_dict['augs']:
                     for model in dataset_dict['models']:
                         task_config = self.running_config_list[0].copy()
                         task_epoch_num = self.running_config_list[2]['training_config'][model][dataset]['epochs']
+                        if 'batch_size' in self.running_config_list[2]['training_config'][model][dataset].keys():
+                            task_batch_size = self.running_config_list[2]['training_config'][model][dataset]['batch_size']
+                        else:
+                            task_batch_size = task_config['batch_size']
                         task_name = f"{model}_{dataset}_{task_epoch_num}epochs_[{aug}_{aug_prob}]"
                         task_config.update({'dataset': dataset, 'model': model, 'augmentations': [aug],
                                             'aug_params': [aug_prob], 'epochs': training_config[model][dataset]['epochs'],
+                                            'batch_size': task_batch_size,
                                            'task_name': task_name, 'baseline': False})
                         self.task_list.append(task_config)
         else: # single task
@@ -87,8 +96,8 @@ class ProjectConfig:
         self.current_dataset_config = None
         self.current_task_name = None
         self.current_task_config = None
-        self.current_text_augmentations = None
-        self.current_feature_augmentations = None
+        self.current_offline_augmentations = None
+        self.current_online_augmentations = None
         self.current_baseline = None
         self.current_logger = None
         self.prev_dataset = None
@@ -112,8 +121,8 @@ class ProjectConfig:
                                             if aug['name'] == aug_name]
             for i, aug in enumerate(augmentation_config_list):
                 aug['prob'] = self.current_task_config['aug_params'][i]
-            self.current_text_augmentations = [aug for aug in augmentation_config_list if aug['space'] == 'text']
-            self.current_feature_augmentations = [aug for aug in augmentation_config_list if aug['space'] == 'feature']
+            self.current_offline_augmentations = [aug for aug in augmentation_config_list if aug['space'] == 'offline']
+            self.current_online_augmentations = [aug for aug in augmentation_config_list if aug['space'] == 'online']
 
             self.current_logger = logging.getLogger('my_project')
             self.current_logger.setLevel(logging.INFO)
@@ -140,8 +149,8 @@ class ProjectConfig:
             return (self.current_task_config,
                     self.current_model_config,
                     self.current_dataset_config,
-                    self.current_text_augmentations,
-                    self.current_feature_augmentations,
+                    self.current_offline_augmentations,
+                    self.current_online_augmentations,
                     self.current_logger,
                     self.new_dataset,
                     self.new_aug,
@@ -151,3 +160,12 @@ class ProjectConfig:
 
     def __getitem__(self, item):
         return self.running_config_list[0][item]
+
+def retry(func, *args, **kwargs):
+    while True:
+        try:
+            res = func(*args, **kwargs)
+        except:
+            continue
+        break
+    return res
