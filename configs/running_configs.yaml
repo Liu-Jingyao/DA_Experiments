@@ -65,41 +65,37 @@ training_config:
   xlnet:
     imdb:
         epochs: 2
-        batch_size: 16
+        batch_size: 2
     sst-2:
         epochs: 2
     rotten_tomatoes:
         epochs: 2
     amazon-5:
         epochs: 2
-        batch_size: 16
+        batch_size: 2
     yelp-5:
         epochs: 2
-        batch_size: 16
+        batch_size: 2
   electra:
     imdb:
         epochs: 2
-        batch_size: 16
+        batch_size: 8
     sst-2:
         epochs: 2
     rotten_tomatoes:
         epochs: 2
     amazon-5:
         epochs: 2
-        batch_size: 16
+        batch_size: 8
     yelp-5:
         epochs: 2
-        batch_size: 16
+        batch_size: 8
 workflow_config:
   synonym_replacement:
-    models: [ distilbert, roberta, albert ]
+    models: [ distilbert ]
     datasets: [ rotten_tomatoes ]
-    prob: 0.1
-#  online_random_replacement:
-#    models: [ distilbert, roberta, albert ]
-#    datasets: [ rotten_tomatoes ]
-#    prob: 0.05
+    prob: 0.5
   pred_loss_replacement:
-    models: [ distilbert, roberta, albert ]
+    models: [ distilbert ]
     datasets: [ rotten_tomatoes ]
-    prob: 0.1
+    prob: 0.5

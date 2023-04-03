@@ -39,14 +39,17 @@
 - name: 'loss_based_replacement'
   space: 'online'
   quality: 'high'
+  exinfo: 'dropout_prob'
 
 - name: 'pred_based_replacement'
   space: 'online'
   quality: 'high'
+  exinfo: 'dropout_prob'
 
 - name: 'pred_loss_replacement'
   space: 'online'
   quality: 'high'
+  exinfo: 'dropout_prob'
 
 - name: 'online_random_replacement'
   space: 'online'

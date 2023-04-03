@@ -45,7 +45,7 @@ if __name__ == '__main__':
         # offline augmentation
         if offline_augmentations:
             if is_new_aug:
-                dataset_helper.offline_augmentation(offline_augmentations, my_logger)
+                dataset_helper.offline_augmentation(offline_augmentations, my_tokenizer, my_logger)
 
         # tokenize
         if is_new_model and model_config['pretrained']:

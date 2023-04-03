@@ -12,7 +12,7 @@ class DatasetHelper:
     def __init__(self, name, dataset, dataset_config, big_dataset=False, map_batch_size=1000):
         self.name = name
         self.dataset_dict = dataset
-        self.train_dataset = dataset['train'] = dataset['train'].train_test_split(train_size=500)['train']
+        self.train_dataset = dataset['train'] = dataset['train'].train_test_split(train_size=2500)['train']
         self.eval_dataset = dataset['validation'] if 'validation' in dataset.keys() else None
         self.test_dataset = dataset['test'] if 'test' in dataset.keys() else None
         self.dataset_config = dataset_config
@@ -83,23 +83,23 @@ class DatasetHelper:
         #                           self.dataset_dict['train']['input_ids'] + self.dataset_dict['validation']['input_ids'] + self.dataset_dict['test']['input_ids'])
         # my_tokenizer.max_length = max_sequence_length
 
-    def offline_augmentation(self, offline_augmentations, my_logger):
+    def offline_augmentation(self, offline_augmentations, my_tokenizer, my_logger):
         self.current_offline_augmentation_flag = offline_augmentations[0]['name']
         augmentation_config = offline_augmentations[0]
         my_logger.info(f"processing {augmentation_config['name']}")
         data_augmentation = OFFLINE_DATA_AUGMENTATION_DICT[augmentation_config['name']]
         data_augmentation_prob = augmentation_config['prob']
-        dataset_to_aug = copy.deepcopy(self.original_train_dataset)
-        dataset_to_aug = datasets.concatenate_datasets([dataset_to_aug] * 4)
-        aug_dataset = dataset_to_aug.map(lambda batch: data_augmentation(batch, self.dataset_config['text_field'],
+
+        aug_dataset = self.original_train_dataset.map(lambda batch: data_augmentation(batch, self.dataset_config['text_field'],
                                                                          data_augmentation_prob),
                                                              batched=True, batch_size=self.map_batch_size,
                                                              load_from_cache_file=False)
+        # aug_dataset = datasets.concatenate_datasets([aug_dataset])
         my_logger.info(f"{self.current_offline_augmentation_flag} down.\n"
                        f"example: original_text='{aug_dataset[0]['original_text']}',"
                        f" aug_text='{aug_dataset[0][self.dataset_config['text_field']]}'")
         self.dataset_dict['train'] = self.train_dataset = datasets.concatenate_datasets([self.original_train_dataset, aug_dataset])
-        self.train_size = self.train_size * 5
+        self.train_size = self.train_size * 2
 
 
     def online_augmentation_preprocess(self, online_augmentations, my_logger, my_tokenizer):
@@ -120,8 +120,8 @@ class DatasetHelper:
                                               load_from_cache_file=False)
             my_tokenizer.model_input_names += [exinfo]
         # duplicate dataset
-        self.dataset_dict['train'] = self.train_dataset = datasets.concatenate_datasets([self.train_dataset] * 5)
-        self.train_size = self.train_size * 5
+        self.dataset_dict['train'] = self.train_dataset = datasets.concatenate_datasets([self.train_dataset] * 2)
+        self.train_size = self.train_size * 2
         my_logger.info(f"{online_augmentation['name']} down.")
         my_logger.info(self.current_online_augmentation_flag)
 
