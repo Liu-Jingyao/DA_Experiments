@@ -13,6 +13,8 @@ class Record(peewee.Model):
   baseline = peewee.BooleanField()
   model = peewee.TextField()
   dataset = peewee.TextField()
+  train_size = peewee.TextField()
+  n_aug = peewee.IntegerField()
   f1 = peewee.DecimalField(11,10)
   accuracy = peewee.DecimalField(11,10)
   epochs = peewee.IntegerField()
@@ -34,6 +36,8 @@ def save_result(task_config, repeat_id, f1, accuracy, run_time, seed):
   record = Record(baseline=task_config['baseline'],
                   model=task_config['model'],
                   dataset=task_config['dataset'],
+                  train_size=task_config['train_size'],
+                  n_aug=task_config['n_aug'],
                   f1=f1, accuracy=accuracy,
                   epochs=task_config['epochs'],
                   repeat_id=repeat_id,

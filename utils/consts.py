@@ -18,7 +18,7 @@ from utils.data_utils import TF_IDFExtractor
 
 # environment vars
 os.environ['CUDA_LAUNCH_BLOCKING'] = '1'
-ROOT_PATH = os.path.dirname(sys.modules['__main__'].__file__)
+ROOT_PATH = os.path.dirname(sys.modules['__main__'].__file__) if hasattr(sys.modules['__main__'], '__file__') else os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DATASET_CACHE_DIR = os.path.join(ROOT_PATH, 'datasets')
 TOKENIZER_CACHE_DIR = os.path.join(ROOT_PATH, 'tokenizers')
 LOG_PATH = os.path.join(ROOT_PATH, 'logs')
@@ -47,5 +47,6 @@ CUSTOM_MODEL_CLASS_DICT: Dict[str, type(PreTrainedModel)] = {names.CNN: CNN,
                                                              names.XLNET: XLNETForSequenceClassification,
                                                              names.ELECTRA: ELECTRAForSequenceClassification}
 CUSTOM_MODEL_PREPROCESS_DICT: Dict[str, callable] = {names.TFIDFS: TF_IDFExtractor.batch_analyze,
-                                                     names.DROPOUT_PROB: TFIDFPreProcess.batch_preprocess}
+                                                     names.DROPOUT_PROB: TFIDFPreProcess.dropout_prob_batch_preprocess,
+                                                     names.REPLACEMENT_PROB: TFIDFPreProcess.replacement_prob_batch_preprocess}
 

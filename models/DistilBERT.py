@@ -20,6 +20,7 @@ class DistilBERTConfig(DistilBertConfig):
 class DistilBERTForSequenceClassification(DistilBertForSequenceClassification, ABC):
     def forward(self, input_ids: Optional[torch.Tensor] = None, attention_mask: Optional[torch.Tensor] = None,
                 dropout_prob: Optional[torch.Tensor] = None,
+                replacement_prob = None,
                 head_mask: Optional[torch.Tensor] = None, inputs_embeds: Optional[torch.Tensor] = None,
                 labels: Optional[torch.LongTensor] = None, output_attentions: Optional[bool] = None,
                 output_hidden_states: Optional[bool] = None, return_dict: Optional[bool] = None,
@@ -28,6 +29,7 @@ class DistilBERTForSequenceClassification(DistilBertForSequenceClassification, A
             for aug_name, aug_prob in self.config.aug_ops.items():
                 aug_res = ONLINE_DATA_AUGMENTATION_DICT[aug_name](input_ids, labels=labels, aug_prob=aug_prob,
                                                                   dropout_prob=dropout_prob,
+                                                                  replacement_prob=replacement_prob,
                                                                   attention_mask=attention_mask,
                                                                   model=self, tokenizer=self.tokenizer,
                                                                   aug_name=aug_name)

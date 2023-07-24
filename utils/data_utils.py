@@ -1,6 +1,7 @@
 import os
 import re
 from abc import ABC
+import difflib
 
 import torch
 from gensim import corpora
@@ -245,3 +246,63 @@ class WordClean:
         else:
             return [self._simple_clean(text) for text in texts]
 
+
+def mark_deleted_words(a, b):
+    prev_s = None
+    text = ""
+    for i, s in enumerate(difflib.ndiff(a, b)):
+        if s[0] == ' ':
+            if prev_s == ' ':
+                text += s[-1]
+            elif prev_s == '+':
+                text += "]" + s[-1]
+            elif prev_s == '-':
+                text += ")" + s[-1]
+            else:
+                text += s[-1]
+        elif s[0] == '-':
+            if prev_s == '-':
+                text += s[-1]
+            elif prev_s == ' ':
+                text += "(" + s[-1]
+            elif prev_s == '+':
+                text += "] (" + s[-1]
+            else:
+                text += s[-1]
+        elif s[0] == '+':
+            if prev_s == '+':
+                text += s[-1]
+            elif prev_s == ' ':
+                text += "[" + s[-1]
+            elif prev_s == '+':
+                text += ") [" + s[-1]
+            else:
+                text += s[-1]
+        prev_s = s[0]
+    return text
+
+def mark_replaced_word(a, b):
+    a_words = a.split()
+    b_words = b.split()
+    result = []
+    i = 0
+    j = 0
+    while i < len(a_words) and j < len(b_words):
+        if a_words[i] == b_words[j]:
+            result.append(b_words[j])
+            i += 1
+            j += 1
+        else:
+            replaced = []
+            while j < len(b_words) and b_words[j] not in a_words:
+                replaced.append(b_words[j])
+                j += 1
+            if len(replaced) > 0:
+                result.append('【' + " ".join(replaced) + '】')
+            else:
+                result.append(b_words[j])
+                j += 1
+    while j < len(b_words):
+        result.append(b_words[j])
+        j += 1
+    return " ".join(result)

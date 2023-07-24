@@ -21,13 +21,23 @@ class TFIDFPreProcess:
             self.idf[int(k)] += v
 
     @staticmethod
-    def batch_preprocess(batch, tfidf_preprocess, **kwargs):
+    def dropout_prob_batch_preprocess(batch, tfidf_preprocess, **kwargs):
         dropout_prob = []
         while len(tqdm._instances) > 0:
             tqdm._instances.pop().close()
         for text in tqdm(batch['input_ids'], desc="Calculating dataset dropout prob"):
             dropout_prob += [tfidf_preprocess.get_text_dropout_prob(text)]
         batch['dropout_prob'] = dropout_prob
+        return batch
+
+    @staticmethod
+    def replacement_prob_batch_preprocess(batch, tfidf_preprocess, **kwargs):
+        replacement_prob = []
+        while len(tqdm._instances) > 0:
+            tqdm._instances.pop().close()
+        for text in tqdm(batch['input_ids'], desc="Calculating dataset dropout prob"):
+            replacement_prob += [tfidf_preprocess.get_text_replacement_prob(text)]
+        batch['replacement_prob'] = replacement_prob
         return batch
 
     @staticmethod
@@ -58,7 +68,6 @@ class TFIDFPreProcess:
             "tf_idf": tf_idf,
         }
 
-
     def get_text_dropout_prob(self, text):
         """Compute the probability of replacing tokens in a sentence."""
         cur_tf_idf = collections.defaultdict(int)
@@ -67,6 +76,7 @@ class TFIDFPreProcess:
         dropout_prob = []
         for word in text:
             dropout_prob += [cur_tf_idf[word]]
+
         dropout_prob = np.array(dropout_prob)
         dropout_prob = np.max(dropout_prob) - dropout_prob
 
@@ -79,6 +89,27 @@ class TFIDFPreProcess:
             np.clip(dropout_prob, 0, 1, out=dropout_prob)
 
         return dropout_prob.tolist()
+
+    def get_text_replacement_prob(self, text):
+        """Compute the probability of replacing tokens in a sentence."""
+        cur_tf_idf = collections.defaultdict(int)
+        for word in text:
+            cur_tf_idf[word] += 1. / len(text) * self.idf[word]
+        replacement_prob = []
+        for word in text:
+            replacement_prob += [cur_tf_idf[word]]
+
+        replacement_prob = np.array(replacement_prob)
+
+        for i, word in enumerate(text):
+            if word in self.all_special_ids:
+                replacement_prob[i] = 0
+
+        if replacement_prob.sum() != 0:
+            replacement_prob = replacement_prob * self.p * len(text) / replacement_prob.sum()
+            np.clip(replacement_prob, 0, 1, out=replacement_prob)
+
+        return replacement_prob.tolist()
 
 def remove_elements_by_keep(a, keep):
     # create boolean mask
@@ -113,4 +144,4 @@ def tfidf_word_dropout(input_ids, attention_mask=None, token_type_ids=None, drop
     if token_type_ids is not None:
         token_type_ids = remove_elements_by_keep(token_type_ids, keep)
 
-    return {'input_ids': input_ids, 'attention_mask': attention_mask, 'token_type_ids': token_type_ids}
+    return {'input_ids': input_ids, 'attention_mask': attention_mask, 'token_type_ids': token_type_ids, 'keep': keep}

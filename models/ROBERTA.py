@@ -21,6 +21,7 @@ class ROBERTAForSequenceClassification(RobertaForSequenceClassification, ABC):
         token_type_ids: Optional[torch.LongTensor] = None,
         position_ids: Optional[torch.LongTensor] = None,
         dropout_prob: Optional[torch.Tensor] = None,
+            replacement_prob=None,
         head_mask: Optional[torch.FloatTensor] = None,
         inputs_embeds: Optional[torch.FloatTensor] = None,
         labels: Optional[torch.LongTensor] = None,
@@ -32,6 +33,7 @@ class ROBERTAForSequenceClassification(RobertaForSequenceClassification, ABC):
             for aug_name, aug_prob in self.config.aug_ops.items():
                 aug_res = ONLINE_DATA_AUGMENTATION_DICT[aug_name](input_ids, labels=labels, aug_prob=aug_prob,
                                                                   dropout_prob=dropout_prob,
+                                                                  replacement_prob=replacement_prob,
                                                                   model=self, tokenizer=self.tokenizer,
                                                                   aug_name=aug_name,
                                                                   attention_mask=attention_mask,

@@ -18,7 +18,7 @@ class ELECTRAForSequenceClassification(ElectraForSequenceClassification, ABC):
         self,
         input_ids: Optional[torch.Tensor] = None,
         attention_mask: Optional[torch.Tensor] = None,
-        dropout_prob = None,
+        dropout_prob = None, replacement_prob = None,
         token_type_ids: Optional[torch.Tensor] = None,
         position_ids: Optional[torch.Tensor] = None,
         head_mask: Optional[torch.Tensor] = None,
@@ -34,6 +34,7 @@ class ELECTRAForSequenceClassification(ElectraForSequenceClassification, ABC):
                                                                   attention_mask=attention_mask,
                                                                   token_type_ids=token_type_ids,
                                                                   dropout_prob=dropout_prob,
+                                                                  replacement_prob=replacement_prob,
                                                                   model=self, tokenizer=self.tokenizer,
                                                                   aug_name=aug_name)
                 input_ids = aug_res['input_ids']

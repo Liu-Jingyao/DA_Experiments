@@ -45,7 +45,7 @@ if __name__ == '__main__':
         # offline augmentation
         if offline_augmentations:
             if is_new_aug:
-                dataset_helper.offline_augmentation(offline_augmentations, my_tokenizer, my_logger)
+                dataset_helper.offline_augmentation(offline_augmentations, my_tokenizer, my_logger, task_config['n_aug'])
 
         # tokenize
         if is_new_model and model_config['pretrained']:
@@ -66,7 +66,7 @@ if __name__ == '__main__':
 
         # online augmentation preprocess
         if (is_new_aug or (is_new_model and model_config['pretrained'])) and online_augmentations:
-            dataset_helper.online_augmentation_preprocess(online_augmentations, my_logger, my_tokenizer)
+            dataset_helper.online_augmentation_preprocess(online_augmentations, my_logger, my_tokenizer, task_config['n_aug'])
 
         # train-test
         training_helper = TrainingHelper(task_config, dataset_helper, data_collator, model_config, dataset_config, my_tokenizer, my_logger)

@@ -1,6 +1,6 @@
 # global params
 
-environment: 'beijing' # vpn, local, quanzhou, neimeng, beijing
+environment: 'vpn' # vpn, local, quanzhou, neimeng, beijing
 batch_size: 32 # 32
 map_batch_size: 1000
 eval_steps: 200 # 1000/200
@@ -37,7 +37,7 @@ training_config:
   roberta:
     imdb:
         epochs: 2
-        batch_size: 16
+        batch_size: 4
     sst-2:
         epochs: 2
     rotten_tomatoes:
@@ -51,7 +51,7 @@ training_config:
   albert:
     imdb:
         epochs: 2
-        batch_size: 16
+        batch_size: 4
     sst-2:
         epochs: 2
     rotten_tomatoes:
@@ -91,11 +91,63 @@ training_config:
         epochs: 2
         batch_size: 8
 workflow_config:
+#  baseline:
+#    models: [ distilbert ]
+#    datasets: [ yelp-5 ]
+#    #    p: [0.05]
+#    train_size: [ 25000 ]
+
+#  baseline:
+#    models: [ distilbert ]
+#    datasets: [ imdb ]
+##    p: [0.05]
+#    train_size: [ 700 ]
+  #  random_word_dropout:
+  #    models: [ distilbert ]
+  #    datasets: [ amazon-5 ]
+  #    p: [0.05]
+  #    train_size: [ 500 ]
+  #    n_aug: 4
+#  random_deletion:
+#    models: [ distilbert ]
+#    datasets: [ rotten_tomatoes, imdb, yelp-5, amazon-5 ]
+#    p: [ 0.1, 0.2, 0.3, 0.5 ]
+#    train_size: [ 500 ]
+#    n_aug: 4
+#  tfidf_word_dropout:
+#    models: [ distilbert ]
+#    datasets: [ rotten_tomatoes, imdb, yelp-5, amazon-5 ]
+#    p: [ 0.1, 0.2, 0.3, 0.5 ]
+#    train_size: [ 500 ]
+#    n_aug: 4
+#  random_deletion:
+#    models: [ distilbert ]
+#    datasets: [ amazon-5 ]
+#    p: [0.05]
+#    train_size: [ 300, 500, 700 ]
+#  tfidf_word_dropout:
+#    models: [ distilbert ]
+#    datasets: [ amazon-5 ]
+#    p: [0.05]
+#    train_size: [ 300, 500, 700 ]
   synonym_replacement:
     models: [ distilbert ]
-    datasets: [ rotten_tomatoes ]
-    prob: 0.5
+    datasets: [ rotten_tomatoes, amazon-5 ]
+    p: [ 0.05 ]
+    train_size: [ 100 ]
+    n_aug: [ 1,2,4,8,16,32 ]
   pred_loss_replacement:
     models: [ distilbert ]
-    datasets: [ rotten_tomatoes ]
-    prob: 0.5
+    datasets: [ rotten_tomatoes, amazon-5 ]
+    p: [ 0.05 ]
+    train_size: [ 100 ]
+    n_aug: [ 1,2,4,8,16,32 ]
+
+#  synonym_replacement:
+#    models: [ distilbert ]
+#    datasets: [ yelp-5 ]
+#    prob: 0.05
+#  pred_loss_replacement:
+#    models: [ distilbert ]
+#    datasets: [ yelp-5 ]
+#    prob: 0.05

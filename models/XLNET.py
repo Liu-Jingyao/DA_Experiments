@@ -20,6 +20,7 @@ class XLNETForSequenceClassification(XLNetForSequenceClassification, ABC):
         input_ids: Optional[torch.Tensor] = None,
         attention_mask: Optional[torch.Tensor] = None,
         dropout_prob = None,
+            replacement_prob=None,
         mems: Optional[torch.Tensor] = None,
         perm_mask: Optional[torch.Tensor] = None,
         target_mapping: Optional[torch.Tensor] = None,
@@ -38,6 +39,7 @@ class XLNETForSequenceClassification(XLNetForSequenceClassification, ABC):
             for aug_name, aug_prob in self.config.aug_ops.items():
                 aug_res = ONLINE_DATA_AUGMENTATION_DICT[aug_name](input_ids, labels=labels, aug_prob=aug_prob,
                                                                   dropout_prob=dropout_prob,
+                                                                  replacement_prob=replacement_prob,
                                                                   attention_mask=attention_mask,
                                                                   token_type_ids=token_type_ids,
                                                                   model=self, tokenizer=self.tokenizer,

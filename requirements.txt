@@ -12,3 +12,4 @@ gevent
 peewee
 pymysql
 transformers[sentencepiece]
+redlines

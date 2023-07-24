@@ -32,52 +32,42 @@ class ProjectConfig:
             if 'baseline' in workflow_config:
                 for dataset in workflow_config['baseline']['datasets']:
                     for model in workflow_config['baseline']['models']:
-                        task_config = self.running_config_list[0].copy()
-                        task_epoch_num = self.running_config_list[2]['training_config'][model][dataset]['epochs']
-                        if 'batch_size' in self.running_config_list[2]['training_config'][model][dataset].keys():
-                            task_batch_size = self.running_config_list[2]['training_config'][model][dataset]['batch_size']
-                        else:
-                            task_batch_size = task_config['batch_size']
-                        task_name = f"{model}_{dataset}_{task_epoch_num}epochs_baseline"
-                        task_config.update({'dataset': dataset, 'model': model,
-                                            'epochs': training_config[model][dataset]['epochs'],
-                                            'task_name': task_name,
-                                            'baseline': True, 'batch_size': task_batch_size,
-                                            'augmentations': [], 'aug_params': []})
-                        self.task_list.append(task_config)
+                        for train_size in workflow_config['baseline']['train_size']:
+                            task_config = self.running_config_list[0].copy()
+                            task_epoch_num = self.running_config_list[2]['training_config'][model][dataset]['epochs']
+                            if 'batch_size' in self.running_config_list[2]['training_config'][model][dataset].keys():
+                                task_batch_size = self.running_config_list[2]['training_config'][model][dataset]['batch_size']
+                            else:
+                                task_batch_size = task_config['batch_size']
+                            task_name = f"{model}_{dataset}_{task_epoch_num}epochs_baseline"
+                            task_config.update({'dataset': dataset, 'train_size': train_size,
+                                                'model': model,
+                                                'epochs': training_config[model][dataset]['epochs'],
+                                                'task_name': task_name,
+                                                'baseline': True, 'batch_size': task_batch_size,
+                                                'augmentations': [], 'aug_params': []})
+                            self.task_list.append(task_config)
                 workflow_config.pop('baseline')
 
-            new_workflow_config = {}
             for aug, aug_dict in workflow_config.items():
                 for dataset in aug_dict['datasets']:
                     for model in aug_dict['models']:
-                        if dataset not in new_workflow_config.keys():
-                            new_workflow_config[dataset] = dict()
-                        if 'augs' not in new_workflow_config[dataset].keys():
-                            new_workflow_config[dataset]['augs'] = list()
-                        if 'models' not in new_workflow_config[dataset].keys():
-                            new_workflow_config[dataset]['models'] = list()
-                        new_workflow_config[dataset]['augs'].append((aug, aug_dict['prob']))
-                        new_workflow_config[dataset]['models'].append(model)
-            for dataset, dataset_dict in new_workflow_config.items():
-                for k in dataset_dict.keys():
-                  new_workflow_config[dataset][k] = list(dict.fromkeys(dataset_dict[k]))
-            # todo 默认为所有的组合，没考虑组合不全的情况
-            for dataset, dataset_dict in new_workflow_config.items():
-                for aug, aug_prob in dataset_dict['augs']:
-                    for model in dataset_dict['models']:
-                        task_config = self.running_config_list[0].copy()
-                        task_epoch_num = self.running_config_list[2]['training_config'][model][dataset]['epochs']
-                        if 'batch_size' in self.running_config_list[2]['training_config'][model][dataset].keys():
-                            task_batch_size = self.running_config_list[2]['training_config'][model][dataset]['batch_size']
-                        else:
-                            task_batch_size = task_config['batch_size']
-                        task_name = f"{model}_{dataset}_{task_epoch_num}epochs_[{aug}_{aug_prob}]"
-                        task_config.update({'dataset': dataset, 'model': model, 'augmentations': [aug],
-                                            'aug_params': [aug_prob], 'epochs': training_config[model][dataset]['epochs'],
-                                            'batch_size': task_batch_size,
-                                           'task_name': task_name, 'baseline': False})
-                        self.task_list.append(task_config)
+                        for p in aug_dict['p']:
+                            for train_size in aug_dict['train_size']:
+                                for n_aug in aug_dict['n_aug']:
+                                    task_config = self.running_config_list[0].copy()
+                                    task_epoch_num = self.running_config_list[2]['training_config'][model][dataset]['epochs']
+                                    if 'batch_size' in self.running_config_list[2]['training_config'][model][dataset].keys():
+                                        task_batch_size = self.running_config_list[2]['training_config'][model][dataset]['batch_size']
+                                    else:
+                                        task_batch_size = task_config['batch_size']
+                                    task_name = f"{model}_{dataset}_{task_epoch_num}epochs_[{aug}_{p}]"
+                                    task_config.update({'dataset': dataset, 'train_size': train_size,
+                                                        'model': model, 'augmentations': [aug],
+                                                        'aug_params': [p], 'epochs': training_config[model][dataset]['epochs'],
+                                                        'batch_size': task_batch_size, 'n_aug': n_aug,
+                                                       'task_name': task_name, 'baseline': False})
+                                    self.task_list.append(task_config)
         else: # single task
             task_config = self.running_config_list[0]
             task_config.update(self.running_config_list[1][self.running_name])
@@ -116,6 +106,7 @@ class ProjectConfig:
             self.current_task_name = self.current_task_config['task_name']
             self.current_model_config = self.model_config_dict[self.current_task_config['model']]
             self.current_dataset_config = self.dataset_config_dict[self.current_task_config['dataset']]
+            self.current_dataset_config['train_size'] = self.current_task_config['train_size']
             augmentation_config_list = [aug for aug_name in self.current_task_config['augmentations']
                                             for aug in self.augmentation_config_dict
                                             if aug['name'] == aug_name]
